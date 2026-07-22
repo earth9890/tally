@@ -69,6 +69,19 @@ GH_TOKEN=$(gh auth token) npm run release   # build + upload to GitHub Releases
 first, then run it. It uploads `Tally-<ver>-arm64.dmg`, the `.zip`, and
 `latest-mac.yml` (the update manifest) to a release tagged `v<version>`.
 
+## Install via Homebrew
+
+```bash
+brew install --cask earth9890/tap/tally
+```
+
+Cask lives in [earth9890/homebrew-tap](https://github.com/earth9890/homebrew-tap).
+After each release, bump it:
+
+```bash
+shasum -a 256 dist/Tally-<ver>-arm64.dmg   # then update version + sha256 in Casks/tally.rb, push
+```
+
 ## Updates
 
 The app uses **electron-updater**. On launch (and hourly) a packaged build
