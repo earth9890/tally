@@ -293,6 +293,7 @@ function registerIpc() {
       tracking: tracker.isRunning(),
       goalHours: goal ? goal.interval_hours : 8,
       updateReady,
+      version: app.getVersion(),
     };
   });
   ipcMain.handle('openDashboard', () => { createWindow(); if (pop) pop.hide(); });

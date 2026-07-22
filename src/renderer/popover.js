@@ -42,6 +42,7 @@ function paint() {
   const uw = $('p-update-wrap');
   uw.hidden = !data.updateReady;
   if (data.updateReady) $('p-update').textContent = `Install v${data.updateReady} & Relaunch`;
+  if (data.version) $('p-quit').textContent = `Quit Tally · v${data.version}`;
 }
 
 async function refresh() {
