@@ -1,7 +1,7 @@
 {
   "name": "tally",
   "productName": "Tally",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Tally — local-first, automatic personal time tracker for macOS",
   "main": "src/main.js",
   "scripts": {

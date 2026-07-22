@@ -292,6 +292,12 @@ function wireRow(el) {
 // ---- settings -----------------------------------------------------------
 
 async function loadSettings() {
+  dt.about().then((a) => {
+    $('ab-ver').textContent = `v${a.version}`;
+    $('ab-electron').textContent = a.electron;
+  });
+  $('ab-repo').onclick = () => dt.openRepo();
+
   const s = await dt.getSettings();
   $('s-idle').value = s.idle_threshold || 300;
   $('s-poll').value = s.poll_interval || 3;

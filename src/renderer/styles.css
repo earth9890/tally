@@ -300,4 +300,18 @@ select:focus-visible { outline: 2px solid color-mix(in oklab, var(--accent) 50%,
 .rem .del { padding: 6px 10px; color: var(--faint); }
 .rem .del:hover { color: var(--coral); border-color: var(--coral); }
 
+/* ---- about ------------------------------------------------------------ */
+.about { display: flex; align-items: center; gap: 12px; margin-top: 28px; padding-top: 22px;
+  border-top: 1px solid var(--border); }
+.about .mark { width: 34px; height: 34px; border-radius: 24%; flex: none;
+  background: linear-gradient(150deg, var(--accent), #dd7008);
+  display: inline-flex; align-items: center; justify-content: center; }
+.about .mark svg { width: 19px; height: 19px; }
+.about .a-name { font-weight: 600; font-size: 14px; letter-spacing: -0.02em; }
+.about .a-ver { font-family: var(--mono); font-weight: 500; font-size: 12px; color: var(--muted); margin-left: 4px; }
+.about .a-sub { font-size: 12px; color: var(--faint); margin-top: 2px; }
+.about .a-link { font: inherit; background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--accent-deep); }
+.about .a-link:hover { text-decoration: underline; }
+
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

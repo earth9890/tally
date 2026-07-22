@@ -2,7 +2,7 @@
 
 const path = require('path');
 const {
-  app, BrowserWindow, Tray, Menu, nativeImage, ipcMain,
+  app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, shell,
 } = require('electron');
 
 const db = require('./db');
@@ -301,6 +301,13 @@ function registerIpc() {
   ipcMain.handle('installUpdate', () => {
     if (_autoUpdater && updateReady) { tracker.stop(); _autoUpdater.quitAndInstall(); }
   });
+  ipcMain.handle('about', () => ({
+    version: app.getVersion(),
+    electron: process.versions.electron,
+    repo: 'https://github.com/earth9890/tally',
+  }));
+  // Fixed URL only — renderer can't open arbitrary links.
+  ipcMain.handle('openRepo', () => shell.openExternal('https://github.com/earth9890/tally'));
 
   ipcMain.handle('getTracking', () => tracker.isRunning());
   ipcMain.handle('setTracking', (_e, on) => {
