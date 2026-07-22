@@ -38,6 +38,10 @@ function paint() {
   const pct = Math.min(100, (data.total / (data.goalHours * 3600)) * 100);
   $('p-bar').style.width = `${pct}%`;
   $('p-pause').textContent = data.tracking ? 'Pause tracking' : 'Resume tracking';
+
+  const uw = $('p-update-wrap');
+  uw.hidden = !data.updateReady;
+  if (data.updateReady) $('p-update').textContent = `Install v${data.updateReady} & Relaunch`;
 }
 
 async function refresh() {
@@ -47,6 +51,7 @@ async function refresh() {
 
 $('p-open').onclick = () => dt.openDashboard();
 $('p-quit').onclick = () => dt.quit();
+$('p-update').onclick = () => dt.installUpdate();
 $('p-pause').onclick = async () => {
   await dt.setTracking(!data.tracking);
   await refresh();

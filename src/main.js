@@ -102,13 +102,15 @@ function createPopover() {
   pop.setAlwaysOnTop(true, 'pop-up-menu');
   pop.loadFile(path.join(__dirname, 'renderer', 'popover.html'));
   // Size the window to the rendered panel so nothing is cropped.
-  pop.webContents.on('did-finish-load', async () => {
-    try {
-      const h = await pop.webContents.executeJavaScript('document.querySelector(".pop").offsetHeight');
-      if (h) pop.setSize(300, Math.ceil(h) + 16, false);
-    } catch (_) { /* keep default height */ }
-  });
+  pop.webContents.on('did-finish-load', sizePopover);
   pop.on('blur', () => { if (pop && !pop.webContents.isDevToolsOpened()) pop.hide(); });
+}
+
+async function sizePopover() {
+  try {
+    const h = await pop.webContents.executeJavaScript('document.querySelector(".pop").offsetHeight');
+    if (h) pop.setSize(300, Math.ceil(h) + 16, false);
+  } catch (_) { /* keep current height */ }
 }
 
 function togglePopover() {
@@ -121,18 +123,26 @@ function togglePopover() {
   pop.setPosition(x, y, false);
   pop.showInactive(); // don't focus → don't activate Tally / switch Space
   pop.webContents.send('popover:refresh');
+  setTimeout(sizePopover, 120); // row set may have changed (e.g. update ready)
 }
 
 // Auto-update: check GitHub Releases on launch and again hourly. Only in a
 // packaged build — electron-updater needs the published latest-mac.yml + zip.
 // (macOS applies updates only for signed builds; unsigned installs still get
 // the "update available" notification but must be replaced manually.)
+let updateReady = null; // version string once an update is downloaded
+let _autoUpdater = null;
+
 function checkForUpdates() {
   if (!app.isPackaged) return;
-  let autoUpdater;
-  try { ({ autoUpdater } = require('electron-updater')); } catch (_) { return; }
-  autoUpdater.checkForUpdatesAndNotify().catch(() => {});
-  setInterval(() => autoUpdater.checkForUpdatesAndNotify().catch(() => {}), 60 * 60 * 1000);
+  try { ({ autoUpdater: _autoUpdater } = require('electron-updater')); } catch (_) { return; }
+  _autoUpdater.on('update-downloaded', (info) => {
+    updateReady = info.version;
+    refreshTray();
+    if (pop && !pop.isDestroyed()) pop.webContents.send('popover:refresh');
+  });
+  _autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+  setInterval(() => _autoUpdater.checkForUpdatesAndNotify().catch(() => {}), 60 * 60 * 1000);
 }
 
 // Mirror the `launch_at_login` setting into the macOS login-item registration.
@@ -282,10 +292,14 @@ function registerIpc() {
       current: tracker.getCurrent(),
       tracking: tracker.isRunning(),
       goalHours: goal ? goal.interval_hours : 8,
+      updateReady,
     };
   });
   ipcMain.handle('openDashboard', () => { createWindow(); if (pop) pop.hide(); });
   ipcMain.handle('quit', () => { tracker.stop(); app.quit(); });
+  ipcMain.handle('installUpdate', () => {
+    if (_autoUpdater && updateReady) { tracker.stop(); _autoUpdater.quitAndInstall(); }
+  });
 
   ipcMain.handle('getTracking', () => tracker.isRunning());
   ipcMain.handle('setTracking', (_e, on) => {

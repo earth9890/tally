@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('api', {
   popoverData: () => ipcRenderer.invoke('popoverData'),
   openDashboard: () => ipcRenderer.invoke('openDashboard'),
   quit: () => ipcRenderer.invoke('quit'),
+  installUpdate: () => ipcRenderer.invoke('installUpdate'),
   onPopoverRefresh: (cb) => ipcRenderer.on('popover:refresh', () => cb()),
   getReminders: () => ipcRenderer.invoke('getReminders'),
   saveReminder: (r) => ipcRenderer.invoke('saveReminder', r),
