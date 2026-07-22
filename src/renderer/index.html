@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:" />
+  <title>Tally</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- ============ SIDEBAR ============ -->
+    <aside id="sidebar">
+      <div class="brand">
+        <span class="mark">
+          <svg viewBox="0 0 100 100"><g stroke="#fff" stroke-width="9" stroke-linecap="round"><line x1="24" y1="22" x2="24" y2="78"/><line x1="42" y1="22" x2="42" y2="78"/><line x1="60" y1="22" x2="60" y2="78"/><line x1="78" y1="22" x2="78" y2="78"/><line x1="16" y1="80" x2="86" y2="20"/></g></svg>
+        </span>
+        <span class="word">Tally</span>
+      </div>
+
+      <nav class="nav">
+        <button data-tab="dashboard" class="active"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Dashboard</button>
+        <button data-tab="history"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Timeline</button>
+        <button data-tab="categories"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>Apps</button>
+        <button data-tab="reminders"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Reminders</button>
+        <button data-tab="settings"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>Settings</button>
+      </nav>
+
+      <div class="now" id="now">
+        <div class="head"><span class="dot"></span><span class="app" id="now-app">—</span></div>
+        <div class="clock" id="now-clock">00:00:00</div>
+        <div class="ctl">
+          <button class="pause" id="now-pause">Pause</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ============ MAIN ============ -->
+    <div id="main">
+      <div id="topbar">
+        <div>
+          <div class="greet" id="tb-greet">Good day</div>
+          <div class="date" id="tb-date">—</div>
+        </div>
+        <div class="right">
+          <div class="status" id="tb-status"><span class="dot"></span><span id="tb-status-text">—</span></div>
+        </div>
+      </div>
+
+      <div id="content">
+        <!-- Dashboard -->
+        <section id="dashboard" class="tab active">
+          <div class="grid">
+            <!-- hero -->
+            <div class="hero">
+              <div class="k">Tracked today</div>
+              <div class="big" id="d-total">—</div>
+              <div class="chip" id="d-chip" hidden></div>
+              <div class="rule"></div>
+              <div class="stats">
+                <div><div class="v acc" id="d-prod">—</div><div class="l">Productive</div></div>
+                <div><div class="v" id="d-apps-n">—</div><div class="l">Apps</div></div>
+                <div><div class="v" id="d-idle">—</div><div class="l">Idle</div></div>
+              </div>
+            </div>
+
+            <!-- week -->
+            <div class="card span8">
+              <div class="card-head"><h3>This week</h3><span class="sub" id="week-sub"></span></div>
+              <div class="week" id="weekChart"></div>
+            </div>
+
+            <!-- category donut -->
+            <div class="card span4">
+              <div class="card-head"><h3>Productivity</h3></div>
+              <div class="donut-wrap">
+                <div class="donut">
+                  <svg viewBox="0 0 140 140" width="130" height="130">
+                    <circle cx="70" cy="70" r="52" fill="none" stroke="var(--track)" stroke-width="16"/>
+                    <g id="donut-segs"></g>
+                  </svg>
+                  <div class="center"><div class="v" id="donut-total">—</div><div class="l">today</div></div>
+                </div>
+                <div class="legend" id="donut-legend"></div>
+              </div>
+            </div>
+
+            <!-- app usage -->
+            <div class="card span8">
+              <div class="card-head"><h3>App &amp; category usage</h3></div>
+              <div class="usage" id="d-apps"></div>
+              <p class="empty" id="d-empty" hidden>No activity tracked yet. Tally records automatically — check back after a few minutes of work.</p>
+            </div>
+
+            <!-- quick facts -->
+            <div class="card span4">
+              <div class="card-head"><h3>Now</h3></div>
+              <div style="font-family:var(--num);font-size:34px;font-weight:600;letter-spacing:-1px" id="d-now-app">—</div>
+              <div class="hint" id="d-now-sub" style="margin-top:8px">—</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Timeline -->
+        <section id="history" class="tab">
+          <p class="eyebrow">Timeline</p>
+          <div class="row"><input type="date" id="h-date" /><span id="h-summary" class="hint"></span></div>
+          <div class="card">
+            <div class="card-head"><h3>Day timeline</h3></div>
+            <div id="timeline"></div>
+            <div class="tl-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+          </div>
+          <div class="card" style="margin-top:16px">
+            <div class="card-head"><h3>Segments</h3></div>
+            <div class="rows" id="h-segments"></div>
+          </div>
+        </section>
+
+        <!-- Apps / categories -->
+        <section id="categories" class="tab">
+          <p class="eyebrow">Apps</p>
+          <p class="hint" style="margin-bottom:16px">Tag each app. Productive apps drive your productivity score.</p>
+          <div class="card cat-card"><div id="cat-rows"></div></div>
+        </section>
+
+        <!-- Reminders -->
+        <section id="reminders" class="tab">
+          <p class="eyebrow">Reminders</p>
+          <div class="rem-head">
+            <p class="hint" style="max-width:520px">Scheduled shout-outs — hourly time, your daily goal, plus login, lunch, tea and logout. Edit the time, days and message, or add your own.</p>
+            <label class="speak" title="Announce with your Mac's voice, not just a notification">
+              <button type="button" id="r-speak" class="switch" role="switch" aria-checked="true"><span></span></button>
+              <span class="k">Speak aloud</span>
+            </label>
+          </div>
+          <div id="rem-rows"></div>
+          <button id="rem-add" class="btn-ghost">+ Add reminder</button>
+        </section>
+
+        <!-- Settings -->
+        <section id="settings" class="tab">
+          <p class="eyebrow">Settings</p>
+          <div class="settings">
+            <label class="field">
+              <span class="k">Idle threshold</span>
+              <span class="control"><input type="number" id="s-idle" min="30" step="10" /><span class="unit">seconds</span></span>
+              <span class="desc">Time without input before you're marked idle.</span>
+            </label>
+            <label class="field">
+              <span class="k">Poll interval</span>
+              <span class="control"><input type="number" id="s-poll" min="1" step="1" /><span class="unit">seconds</span></span>
+              <span class="desc">How often the foreground app is sampled.</span>
+            </label>
+            <div class="field">
+              <span class="k">Launch at login</span>
+              <button type="button" id="s-login" class="switch" role="switch" aria-checked="true"><span></span></button>
+              <span class="desc">Start automatically in the menu bar when you log in.</span>
+            </div>
+            <div class="field">
+              <span class="k">Tracking</span>
+              <button type="button" id="s-tracking" class="switch" role="switch" aria-checked="true"><span></span></button>
+              <span class="desc">Pause to stop recording activity.</span>
+            </div>
+            <div class="field">
+              <button id="s-save" class="btn-primary">Save changes</button>
+              <span id="s-msg" class="hint"></span>
+            </div>
+          </div>
+          <div class="note">
+            <p>Data lives in a local SQLite file. Nothing leaves this machine.</p>
+            <p>macOS: grant <b>Accessibility</b> and <b>Screen Recording</b> to Electron in System Settings → Privacy &amp; Security to read app titles and browser URLs.</p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

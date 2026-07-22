@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'" />
+  <title>Tally</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    html, body { background: transparent; overflow: hidden; }
+    body { padding: 8px; }
+    .pop {
+      background: light-dark(#fffdf8, #1a1815);
+      border: 1px solid light-dark(rgba(28,25,23,.1), rgba(255,255,255,.08));
+      border-radius: 12px; overflow: hidden;
+      box-shadow: 0 1px 1px rgba(0,0,0,.04), 0 10px 20px -6px rgba(0,0,0,.22), 0 24px 34px -10px rgba(0,0,0,.20);
+      animation: pin .16s var(--ease) both;
+    }
+    @keyframes pin { from { opacity: 0; transform: translateY(-4px) scale(.99); } to { opacity: 1; transform: none; } }
+
+    .pt { padding: 16px 16px 14px; }
+    .pt-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .pt-l { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--ink); min-width: 0; }
+    .pt-l span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pdot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+    .pdot.live { animation: tlpulse 2s infinite; }
+    .pdot.off { background: var(--faint); }
+    .pt-timer { font-size: 14px; font-weight: 500; color: var(--ink); }
+
+    .pt-main { display: flex; justify-content: space-between; align-items: baseline; }
+    .pt-big { font-family: var(--num); font-size: 30px; font-weight: 600; letter-spacing: -1px; color: var(--ink); }
+    .pt-sub { font-size: 12px; color: var(--faint); margin-top: 5px; }
+    .pt-r { text-align: right; }
+    .pt-pct { font-family: var(--num); font-size: 20px; font-weight: 600; color: var(--accent); }
+
+    .pbar { height: 6px; border-radius: 99px; background: var(--track); margin-top: 14px; overflow: hidden; }
+    .pbar > i { display: block; height: 100%; width: 0; border-radius: 99px; background: var(--accent); transition: width .4s var(--ease); }
+
+    .pdiv { height: 1px; background: light-dark(rgba(28,25,23,.08), rgba(255,255,255,.07)); }
+    .pmenu { padding: 6px; }
+    .pitem { display: flex; align-items: center; padding: 9px 10px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--ink); cursor: default; }
+    .pitem + .pitem { margin-top: 2px; }
+    .pitem:hover { background: light-dark(rgba(28,25,23,.06), rgba(255,255,255,.07)); }
+    .pitem.accent { color: light-dark(#7c4a03, var(--accent)); }
+    .pitem.accent:hover { background: var(--accent-soft); }
+    .pitem.quit { color: var(--muted); font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div class="pop">
+    <div class="pt">
+      <div class="pt-head">
+        <div class="pt-l"><span class="pdot" id="p-dot"></span><span id="p-status">Tracking</span></div>
+        <span class="pt-timer" id="p-timer">00:00</span>
+      </div>
+      <div class="pt-main">
+        <div><div class="pt-big" id="p-total">—</div><div class="pt-sub" id="p-goal">Today</div></div>
+        <div class="pt-r"><div class="pt-pct" id="p-pct">—</div><div class="pt-sub">productive</div></div>
+      </div>
+      <div class="pbar"><i id="p-bar"></i></div>
+    </div>
+    <div class="pdiv"></div>
+    <div class="pmenu">
+      <div class="pitem" id="p-open">Open Dashboard</div>
+      <div class="pitem accent" id="p-pause">Pause tracking</div>
+    </div>
+    <div class="pdiv"></div>
+    <div class="pmenu"><div class="pitem quit" id="p-quit">Quit Tally</div></div>
+  </div>
+  <script src="popover.js"></script>
+</body>
+</html>
