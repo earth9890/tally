@@ -143,8 +143,15 @@ function syncLoginItem() {
 }
 
 function createTray() {
-  // No asset needed: empty image + text title works on the macOS menu bar.
-  tray = new Tray(nativeImage.createEmpty());
+  // Tally mark as a template image (auto-tinted for light/dark menu bar) + the
+  // running total as the title next to it.
+  let img = nativeImage.createEmpty();
+  try {
+    img = nativeImage.createFromPath(path.join(__dirname, 'assets', 'trayTemplate.png'))
+      .resize({ width: 18, height: 18 });
+    img.setTemplateImage(true);
+  } catch (_) { /* fall back to text-only */ }
+  tray = new Tray(img);
   tray.setToolTip('Tally');
   tray.on('click', togglePopover);
   tray.on('right-click', () => tray.popUpContextMenu(trayMenu()));

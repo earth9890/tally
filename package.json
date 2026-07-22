@@ -1,7 +1,7 @@
 {
   "name": "tally",
   "productName": "Tally",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Tally — local-first, automatic personal time tracker for macOS",
   "main": "src/main.js",
   "scripts": {
@@ -19,6 +19,7 @@
       "**/*.node"
     ],
     "mac": {
+      "icon": "build/icon.png",
       "category": "public.app-category.productivity",
       "target": [
         { "target": "dmg", "arch": ["arm64"] },
