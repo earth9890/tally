@@ -27,11 +27,12 @@ function bundledSound(r) {
   return null;
 }
 
-// Returns the mp3 to play for a reminder, or null (voice-only reminder).
+// Returns the mp3 to play for a reminder, or null → falls back to the voice.
+// The whole sound system is gated on the "custom_sounds" setting: off = voice
+// announcements only; on = mp3s (user-chosen file, else the bundled default).
 function soundFor(r) {
-  if (db.getSettings().custom_sounds === '1' && r.sound && fs.existsSync(r.sound)) {
-    return r.sound;
-  }
+  if (db.getSettings().custom_sounds !== '1') return null;
+  if (r.sound && fs.existsSync(r.sound)) return r.sound;
   const name = bundledSound(r);
   if (!name) return null;
   const p = path.join(SOUND_DIR, name);
