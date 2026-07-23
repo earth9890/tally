@@ -1,7 +1,7 @@
 {
   "name": "tally",
   "productName": "Tally",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Tally — local-first, automatic personal time tracker for macOS",
   "main": "src/main.js",
   "scripts": {
@@ -16,6 +16,7 @@
     "productName": "Tally",
     "asarUnpack": [
       "node_modules/get-windows/**",
+      "src/assets/sounds/**",
       "**/*.node"
     ],
     "mac": {

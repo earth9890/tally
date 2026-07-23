@@ -52,6 +52,9 @@ function init() {
     );
   `);
 
+  // Migration: per-reminder custom sound path (added after v0.1.5).
+  try { db.exec('ALTER TABLE reminders ADD COLUMN sound TEXT'); } catch (_) { /* exists */ }
+
   seedDefaults();
   return db;
 }
@@ -70,6 +73,7 @@ const DEFAULT_SETTINGS = {
   tracking: '1',            // 1 = tracking, 0 = paused
   launch_at_login: '1',     // 1 = start automatically at login (default on)
   announce_voice: '1',      // 1 = speak reminders aloud (macOS `say`)
+  custom_sounds: '0',       // 1 = per-reminder custom mp3s can be chosen/used
 };
 
 const DEFAULT_REMINDERS = [
@@ -146,16 +150,18 @@ function getReminder(id) {
 }
 
 function upsertReminder(r) {
+  r.sound = r.sound || null;
   if (r.id) {
     db.prepare(`
       UPDATE reminders SET kind=@kind, label=@label, message=@message, time=@time,
-        interval_hours=@interval_hours, weekdays_only=@weekdays_only, enabled=@enabled
+        interval_hours=@interval_hours, weekdays_only=@weekdays_only, enabled=@enabled,
+        sound=@sound
       WHERE id=@id`).run(r);
     return r.id;
   }
   const info = db.prepare(`
-    INSERT INTO reminders (kind, label, message, time, interval_hours, weekdays_only, enabled)
-    VALUES (@kind, @label, @message, @time, @interval_hours, @weekdays_only, @enabled)`).run(r);
+    INSERT INTO reminders (kind, label, message, time, interval_hours, weekdays_only, enabled, sound)
+    VALUES (@kind, @label, @message, @time, @interval_hours, @weekdays_only, @enabled, @sound)`).run(r);
   return info.lastInsertRowid;
 }
 

@@ -220,14 +220,25 @@ function remIcon(r) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONS[remIconKey(r)]}</svg>`;
 }
 
+let customSounds = false;
+
 async function loadReminders() {
   const s = await dt.getSettings();
+  customSounds = s.custom_sounds === '1';
   const speak = $('r-speak');
   speak.setAttribute('aria-checked', String(s.announce_voice !== '0'));
   speak.onclick = () => {
     const on = speak.getAttribute('aria-checked') !== 'true';
     speak.setAttribute('aria-checked', String(on));
     dt.setSetting('announce_voice', on ? '1' : '0');
+  };
+  const custom = $('r-custom');
+  custom.setAttribute('aria-checked', String(customSounds));
+  custom.onclick = async () => {
+    customSounds = custom.getAttribute('aria-checked') !== 'true';
+    custom.setAttribute('aria-checked', String(customSounds));
+    await dt.setSetting('custom_sounds', customSounds ? '1' : '0');
+    loadReminders(); // re-render rows to show/hide sound pickers
   };
 
   const list = await dt.getReminders();
@@ -250,12 +261,20 @@ function remRow(r) {
   } else {
     when = `<span class="when"><input type="time" class="time" value="${esc(r.time || '12:00')}" /><label class="wkl"><input type="checkbox" class="wk" ${r.weekdays_only ? 'checked' : ''}/><span>Mon–Fri</span></label></span>`;
   }
-  return `<div class="rem" data-id="${r.id}" data-kind="${r.kind}" data-enabled="${r.enabled ? 1 : 0}">
+  const soundName = r.sound ? r.sound.split('/').pop() : '';
+  const soundUi = customSounds ? `
+      <div class="rsound">
+        <button type="button" class="snd" title="Choose an mp3 (max 10s)">♪ ${soundName ? esc(soundName) : 'Default sound'}</button>
+        ${soundName ? '<button type="button" class="sndclear" title="Back to default sound">✕</button>' : ''}
+        <span class="snderr"></span>
+      </div>` : '';
+  return `<div class="rem" data-id="${r.id}" data-kind="${r.kind}" data-enabled="${r.enabled ? 1 : 0}" data-sound="${esc(r.sound || '')}">
     <button type="button" class="switch en" role="switch" aria-checked="${r.enabled ? 'true' : 'false'}"><span></span></button>
     <span class="ricon">${remIcon(r)}</span>
     <div class="rbody">
       <div class="rtop"><input class="label" value="${esc(r.label)}" />${when}</div>
       <input class="msg" value="${esc(r.message || '')}" placeholder="Message${r.kind === 'interval' ? ' — use {time}' : ''}" />
+      ${soundUi}
     </div>
     <div class="ractions">
       <button type="button" class="test" title="Preview now">Test</button>
@@ -276,6 +295,7 @@ function wireRow(el) {
     interval_hours: (kind === 'interval' || kind === 'goal') ? Number(el.querySelector('.ivl').value) || 1 : null,
     weekdays_only: kind === 'daily' && el.querySelector('.wk').checked ? 1 : 0,
     enabled: en.getAttribute('aria-checked') === 'true' ? 1 : 0,
+    sound: el.dataset.sound || null,
   });
   const save = () => dt.saveReminder(gather());
   en.onclick = () => {
@@ -287,6 +307,28 @@ function wireRow(el) {
   el.querySelectorAll('input').forEach((i) => { i.onchange = save; });
   el.querySelector('.test').onclick = async () => { await save(); dt.testReminder(id); };
   el.querySelector('.del').onclick = async () => { await dt.deleteReminder(id); el.remove(); };
+
+  const snd = el.querySelector('.snd');
+  if (snd) {
+    const err = el.querySelector('.snderr');
+    snd.onclick = async () => {
+      const r = await dt.chooseSound();
+      if (r.canceled) return;
+      if (r.error) { err.textContent = r.error; return; }
+      err.textContent = '';
+      el.dataset.sound = r.path;
+      await save();
+      loadReminders();
+    };
+    const clear = el.querySelector('.sndclear');
+    if (clear) {
+      clear.onclick = async () => {
+        el.dataset.sound = '';
+        await save();
+        loadReminders();
+      };
+    }
+  }
 }
 
 // ---- settings -----------------------------------------------------------

@@ -6,7 +6,37 @@
 
 const { Notification } = require('electron');
 const { execFile } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 const db = require('./db');
+
+// Bundled sounds (src/assets/sounds). asar can't be read by afplay, so swap in
+// the unpacked path when packaged.
+const SOUND_DIR = path.join(__dirname, 'assets', 'sounds')
+  .replace('app.asar', 'app.asar.unpacked');
+
+// kind/label → bundled mp3
+function bundledSound(r) {
+  if (r.kind === 'interval') return 'hourly.mp3';
+  if (r.kind === 'goal') return 'daily-goal-logout.mp3';
+  const l = (r.label || '').toLowerCase();
+  if (l.includes('login') || l.includes('start') || l.includes('morning')) return 'goodmorning.mp3';
+  if (l.includes('lunch') || l.includes('meal')) return 'lunchbreak.mp3';
+  if (l.includes('tea') || l.includes('coffee')) return 'tea-sound.mp3';
+  if (l.includes('logout') || l.includes('log out') || l.includes('wrap')) return 'daily-goal-logout.mp3';
+  return null;
+}
+
+// Returns the mp3 to play for a reminder, or null (voice-only reminder).
+function soundFor(r) {
+  if (db.getSettings().custom_sounds === '1' && r.sound && fs.existsSync(r.sound)) {
+    return r.sound;
+  }
+  const name = bundledSound(r);
+  if (!name) return null;
+  const p = path.join(SOUND_DIR, name);
+  return fs.existsSync(p) ? p : null;
+}
 
 let timer = null;
 const firedDaily = new Map();     // id -> 'YYYY-M-D'      (once per day)
@@ -33,14 +63,17 @@ function speak(text) {
   try { execFile('say', [text]); } catch (_) { /* `say` unavailable */ }
 }
 
-function announce(title, body) {
-  try { new Notification({ title, body }).show(); } catch (_) {}
-  speak(body);
-}
-
-// Fire a reminder immediately (used by the "Test" button and the scheduler).
+// Fire a reminder: notification always; then its sound, else the spoken voice
+// (not both — overlapping audio is noise).
 function fire(r, now = new Date()) {
-  announce(r.label, renderMessage(r, now));
+  const body = renderMessage(r, now);
+  try { new Notification({ title: r.label, body, silent: true }).show(); } catch (_) {}
+  const snd = soundFor(r);
+  if (snd) {
+    try { execFile('afplay', [snd]); } catch (_) { speak(body); }
+  } else {
+    speak(body);
+  }
 }
 
 function check() {

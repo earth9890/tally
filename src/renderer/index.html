@@ -128,10 +128,17 @@
           <p class="eyebrow">Reminders</p>
           <div class="rem-head">
             <p class="hint" style="max-width:520px">Scheduled shout-outs — hourly time, your daily goal, plus login, lunch, tea and logout. Edit the time, days and message, or add your own.</p>
-            <label class="speak" title="Announce with your Mac's voice, not just a notification">
-              <button type="button" id="r-speak" class="switch" role="switch" aria-checked="true"><span></span></button>
-              <span class="k">Speak aloud</span>
-            </label>
+            <div class="rem-toggles">
+              <!-- div, not label: a button inside a label gets its click fired twice -->
+              <div class="speak" title="Announce with your Mac's voice, not just a notification">
+                <button type="button" id="r-speak" class="switch" role="switch" aria-checked="true"><span></span></button>
+                <span class="k">Speak aloud</span>
+              </div>
+              <div class="speak" title="Pick your own mp3 per reminder (max 10s)">
+                <button type="button" id="r-custom" class="switch" role="switch" aria-checked="false"><span></span></button>
+                <span class="k">Custom sounds</span>
+              </div>
+            </div>
           </div>
           <div id="rem-rows"></div>
           <button id="rem-add" class="btn-ghost">+ Add reminder</button>

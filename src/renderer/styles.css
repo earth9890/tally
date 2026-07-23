@@ -243,8 +243,20 @@ select:focus-visible { outline: 2px solid color-mix(in oklab, var(--accent) 50%,
 .catpill:focus-visible { outline: 2px solid color-mix(in oklab, var(--accent) 50%, transparent); }
 
 .rem-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; margin-bottom: 18px; }
+.rem-head .rem-toggles { display: flex; flex-direction: column; gap: 10px; flex: none; }
 .rem-head .speak { display: inline-flex; align-items: center; gap: 10px; flex: none; cursor: pointer; }
 .rem-head .speak .k { font-weight: 500; font-size: 13px; }
+
+.rem .rsound { display: flex; align-items: center; gap: 8px; }
+.rem .snd { font: inherit; font-size: 12px; cursor: pointer; color: var(--muted);
+  background: transparent; border: 1px solid var(--border-2); border-radius: 999px; padding: 4px 12px;
+  transition: color .12s, border-color .12s; max-width: 260px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.rem .snd:hover { color: var(--accent-deep); border-color: var(--accent); }
+.rem .sndclear { font: inherit; font-size: 11px; cursor: pointer; color: var(--faint);
+  background: none; border: none; padding: 2px 4px; }
+.rem .sndclear:hover { color: var(--coral); }
+.rem .snderr { font-size: 12px; color: var(--coral); }
 
 /* ---- settings --------------------------------------------------------- */
 .settings { display: flex; flex-direction: column; gap: 28px; max-width: 500px; }

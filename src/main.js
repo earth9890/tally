@@ -309,6 +309,28 @@ function registerIpc() {
   // Fixed URL only — renderer can't open arbitrary links.
   ipcMain.handle('openRepo', () => shell.openExternal('https://github.com/earth9890/tally'));
 
+  // Pick a custom reminder sound: mp3 only, max 10 seconds (checked via afinfo).
+  ipcMain.handle('chooseSound', async () => {
+    const { dialog } = require('electron');
+    const r = await dialog.showOpenDialog({
+      title: 'Choose a reminder sound (mp3, max 10s)',
+      filters: [{ name: 'MP3 audio', extensions: ['mp3'] }],
+      properties: ['openFile'],
+    });
+    if (r.canceled || !r.filePaths.length) return { canceled: true };
+    const file = r.filePaths[0];
+    if (!file.toLowerCase().endsWith('.mp3')) return { error: 'Only .mp3 files are supported.' };
+    const dur = await new Promise((resolve) => {
+      execFile('afinfo', [file], (err, out) => {
+        const m = !err && String(out).match(/estimated duration:\s*([\d.]+)/);
+        resolve(m ? parseFloat(m[1]) : null);
+      });
+    });
+    if (dur == null) return { error: 'Could not read that file.' };
+    if (dur > 10) return { error: `Too long (${dur.toFixed(1)}s) — max 10 seconds.` };
+    return { path: file, name: path.basename(file) };
+  });
+
   ipcMain.handle('getTracking', () => tracker.isRunning());
   ipcMain.handle('setTracking', (_e, on) => {
     if (on) { tracker.start(); db.setSetting('tracking', 1); }
