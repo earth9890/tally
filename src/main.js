@@ -269,6 +269,7 @@ function registerIpc() {
     if (key === 'agent_watch') {
       if (value === '1' || value === 1) agents.start(); else agents.stop();
     }
+    if (key === 'agent_caps' && String(value) === '0') agents.ledOff();
     return true;
   });
 
@@ -389,4 +390,4 @@ app.whenReady().then(() => {
   if (app.dock) app.dock.hide();
 });
 
-app.on('before-quit', () => tracker.stop());
+app.on('before-quit', () => { tracker.stop(); agents.stop(); });

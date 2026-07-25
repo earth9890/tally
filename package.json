@@ -17,6 +17,7 @@
     "asarUnpack": [
       "node_modules/get-windows/**",
       "src/assets/sounds/**",
+      "src/assets/bin/**",
       "**/*.node"
     ],
     "mac": {

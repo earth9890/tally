@@ -342,14 +342,19 @@ function agoShort(ts) {
 
 async function loadAgents() {
   const s = await dt.getSettings();
-  const sw = $('ag-watch');
-  sw.setAttribute('aria-checked', String(s.agent_watch === '1'));
-  sw.onclick = async () => {
-    const on = sw.getAttribute('aria-checked') !== 'true';
-    sw.setAttribute('aria-checked', String(on));
-    await dt.setSetting('agent_watch', on ? '1' : '0');
-    renderAgents();
+  const wire = (id, key, def) => {
+    const el = $(id);
+    el.setAttribute('aria-checked', String((s[key] || def) === '1'));
+    el.onclick = async () => {
+      const on = el.getAttribute('aria-checked') !== 'true';
+      el.setAttribute('aria-checked', String(on));
+      await dt.setSetting(key, on ? '1' : '0');
+      renderAgents();
+    };
   };
+  wire('ag-watch', 'agent_watch', '0');
+  wire('ag-caps', 'agent_caps', '1');
+  wire('ag-voice', 'agent_voice', '0');
   renderAgents();
 }
 

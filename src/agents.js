@@ -30,6 +30,34 @@ let latest = [];                // last computed session list (for the UI)
 const cwdCache = new Map();     // pid -> cwd
 const states = new Map();       // transcript path -> { state, since }
 
+// ---- caps-lock LED indicator ------------------------------------------------
+// Gentle 1s-cadence blink while any watched agent is working; forced off the
+// moment nothing is working, the watch stops, or the app quits. Note: macOS
+// exposes no LED-only control — this toggles real caps-lock state, so typing
+// during an "on" phase produces capitals. Documented in the UI hint.
+const CAPSLED = path.join(__dirname, 'assets', 'bin', 'capsled')
+  .replace('app.asar', 'app.asar.unpacked');
+const BLINK_MS = 1000;
+
+let blinkTimer = null;
+let ledOn = false;
+
+function led(on) {
+  ledOn = on;
+  try { execFile(CAPSLED, [on ? 'on' : 'off']); } catch (_) {}
+}
+
+function setBlinking(active) {
+  if (active && !blinkTimer) {
+    blinkTimer = setInterval(() => led(!ledOn), BLINK_MS);
+    led(true);
+  } else if (!active && blinkTimer) {
+    clearInterval(blinkTimer);
+    blinkTimer = null;
+    led(false);
+  }
+}
+
 // ---- process discovery ----------------------------------------------------
 
 function ps() {
@@ -161,7 +189,7 @@ function announce(session) {
   const title = session.tool === 'claude' ? 'Claude is done' : 'Codex is done';
   const body = `${session.project} — finished, waiting for you`;
   try { new Notification({ title, body, silent: true }).show(); } catch (_) {}
-  if (db.getSettings().announce_voice !== '0') {
+  if (db.getSettings().agent_voice === '1') {
     try { execFile('say', [`${session.tool === 'claude' ? 'Claude' : 'Codex'} is done in ${session.project}`]); } catch (_) {}
   }
 }
@@ -206,6 +234,10 @@ async function tick() {
 
   baseline = false;
   latest = list.sort((a, b) => (a.state === 'working' ? -1 : 1) - (b.state === 'working' ? -1 : 1));
+
+  // Caps-lock LED: blink while anything is working (if enabled).
+  const anyWorking = latest.some((s) => s.state === 'working');
+  setBlinking(anyWorking && db.getSettings().agent_caps !== '0');
 }
 
 // ---- lifecycle -------------------------------------------------------------
@@ -221,10 +253,13 @@ function start() {
 
 function stop() {
   if (timer) { clearInterval(timer); timer = null; }
+  setBlinking(false); // always leave caps lock off
   latest = [];
 }
 
 function isRunning() { return timer !== null; }
 function getSessions() { return latest; }
 
-module.exports = { start, stop, isRunning, getSessions };
+function ledOff() { setBlinking(false); }
+
+module.exports = { start, stop, isRunning, getSessions, ledOff };
