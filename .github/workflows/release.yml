@@ -60,14 +60,24 @@ jobs:
       # first arch's file copy (shipped an x86_64 sqlite inside the arm64 dmg
       # in 0.2.0-0.2.3). Each invocation also overwrites latest-mac.yml, so we
       # merge the manifests and publish the assets ourselves.
+      # CSC_LINK/CSC_KEY_PASSWORD: the maintainer's Apple certificate. Signing
+      # every build with the same identity keeps macOS TCC grants
+      # (Accessibility / Screen Recording) valid across updates — without it,
+      # ad-hoc builds get a new identity per release and permissions re-prompt.
       - name: Build arm64
         if: steps.gate.outputs.exists == 'false'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         run: |
           npx electron-builder --mac --arm64 --publish never
           cp dist/latest-mac.yml dist/arm.yml
 
       - name: Build x64
         if: steps.gate.outputs.exists == 'false'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         run: npx electron-builder --mac --x64 --publish never
 
       - name: Merge update manifests
@@ -89,6 +99,11 @@ jobs:
           done
           grep -q "arm64.zip" dist/latest-mac.yml && grep -q "x64.zip" dist/latest-mac.yml \
             || { echo "latest-mac.yml missing an arch"; exit 1; }
+          # Signature gate: builds must carry the stable team identity, not ad-hoc
+          for appdir in dist/mac-arm64/Tally.app dist/mac/Tally.app; do
+            codesign -dv "$appdir" 2>&1 | grep -q "TeamIdentifier=W25468P33N" \
+              || { echo "NOT SIGNED WITH TEAM IDENTITY: $appdir"; codesign -dv "$appdir" 2>&1; exit 1; }
+          done
 
       - name: Publish release
         if: steps.gate.outputs.exists == 'false'
