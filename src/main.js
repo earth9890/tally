@@ -101,16 +101,7 @@ function createPopover() {
   pop.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
   pop.setAlwaysOnTop(true, 'pop-up-menu');
   pop.loadFile(path.join(__dirname, 'renderer', 'popover.html'));
-  // Size the window to the rendered panel so nothing is cropped.
-  pop.webContents.on('did-finish-load', sizePopover);
   pop.on('blur', () => { if (pop && !pop.webContents.isDevToolsOpened()) pop.hide(); });
-}
-
-async function sizePopover() {
-  try {
-    const h = await pop.webContents.executeJavaScript('document.querySelector(".pop").offsetHeight');
-    if (h) pop.setSize(300, Math.ceil(h) + 16, false);
-  } catch (_) { /* keep current height */ }
 }
 
 function togglePopover() {
@@ -122,8 +113,7 @@ function togglePopover() {
   const y = Math.round(tb.y + tb.height + 2);
   pop.setPosition(x, y, false);
   pop.showInactive(); // don't focus → don't activate Tally / switch Space
-  pop.webContents.send('popover:refresh');
-  setTimeout(sizePopover, 120); // row set may have changed (e.g. update ready)
+  pop.webContents.send('popover:refresh'); // paint() reports height back → resize
 }
 
 // Auto-update: check GitHub Releases on launch and again hourly. Only in a
@@ -297,6 +287,10 @@ function registerIpc() {
     };
   });
   ipcMain.handle('openDashboard', () => { createWindow(); if (pop) pop.hide(); });
+  // Renderer reports its content height after every paint — authoritative fit.
+  ipcMain.handle('popover:resize', (_e, h) => {
+    if (pop && !pop.isDestroyed() && h > 0) pop.setSize(300, Math.ceil(h) + 16, false);
+  });
   ipcMain.handle('quit', () => { tracker.stop(); app.quit(); });
   ipcMain.handle('installUpdate', () => {
     if (_autoUpdater && updateReady) { tracker.stop(); _autoUpdater.quitAndInstall(); }

@@ -43,6 +43,9 @@ function paint() {
   uw.hidden = !data.updateReady;
   if (data.updateReady) $('p-update').textContent = `Install v${data.updateReady} & Relaunch`;
   if (data.version) $('p-quit').textContent = `Quit Tally · v${data.version}`;
+
+  // Row set may have changed (update row) — tell main to fit the window.
+  dt.resizePopover(document.querySelector('.pop').offsetHeight);
 }
 
 async function refresh() {
