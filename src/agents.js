@@ -44,7 +44,10 @@ let ledOn = false;
 
 function led(on) {
   ledOn = on;
-  try { execFile(CAPSLED, [on ? 'on' : 'off']); } catch (_) {}
+  // Callback is load-bearing: without it a spawn failure (missing/blocked
+  // binary) emits an unhandled 'error' and crashes the main process — on a
+  // 1s blink cadence that would be a crash loop.
+  try { execFile(CAPSLED, [on ? 'on' : 'off'], () => {}); } catch (_) {}
 }
 
 function setBlinking(active) {
@@ -190,11 +193,19 @@ function announce(session) {
   const body = `${session.project} — finished, waiting for you`;
   try { new Notification({ title, body, silent: true }).show(); } catch (_) {}
   if (db.getSettings().agent_voice === '1') {
-    try { execFile('say', [`${session.tool === 'claude' ? 'Claude' : 'Codex'} is done in ${session.project}`]); } catch (_) {}
+    try { execFile('say', [`${session.tool === 'claude' ? 'Claude' : 'Codex'} is done in ${session.project}`], () => {}); } catch (_) {}
   }
 }
 
+let busy = false; // a slow lsof must not stack concurrent scans
+
 async function tick() {
+  if (busy) return;
+  busy = true;
+  try { await scan(); } finally { busy = false; }
+}
+
+async function scan() {
   const psOut = await ps();
   const claudePids = interactivePids(psOut, 'claude');
   const codexPids = interactivePids(psOut, 'codex');
@@ -247,6 +258,7 @@ function start() {
   baseline = true;
   states.clear();
   cwdCache.clear();
+  led(false); // normalize: clears a stuck light left by a crash mid-blink
   timer = setInterval(() => { tick().catch(() => {}); }, POLL_MS);
   tick().catch(() => {});
 }
