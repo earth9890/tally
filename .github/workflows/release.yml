@@ -76,12 +76,18 @@ jobs:
       - name: Update Homebrew cask
         if: steps.gate.outputs.exists == 'false'
         env:
-          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+          # Deploy key: write access scoped to earth9890/homebrew-tap only.
+          TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
           VERSION: ${{ steps.v.outputs.version }}
         run: |
           ARM=$(shasum -a 256 dist/Tally-"$VERSION"-arm64.dmg | awk '{print $1}')
           X64=$(shasum -a 256 dist/Tally-"$VERSION"-x64.dmg | awk '{print $1}')
-          git clone "https://x-access-token:${TAP_TOKEN}@github.com/earth9890/homebrew-tap.git" tap
+          mkdir -p ~/.ssh
+          printf '%s\n' "$TAP_DEPLOY_KEY" > ~/.ssh/tap_key
+          chmod 600 ~/.ssh/tap_key
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/tap_key -o IdentitiesOnly=yes"
+          git clone git@github.com:earth9890/homebrew-tap.git tap
           # Regenerate the cask wholesale — templating beats sed-in-place.
           cat > tap/Casks/tally.rb <<EOF
           cask "tally" do

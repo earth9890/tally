@@ -22,8 +22,9 @@ Merges without a version bump (docs, refactors) skip the release automatically.
 Branch rules: **master takes PRs only** (no direct commits), force pushes are
 blocked on all branches in both repos. Day-to-day work happens on `dev`.
 
-Secrets: `TAP_TOKEN` (Actions secret on earth9890/tally) — token with write
-access to earth9890/homebrew-tap, used only for the cask push.
+Secrets: `TAP_DEPLOY_KEY` (Actions secret on earth9890/tally) — SSH deploy key
+whose write access is scoped to earth9890/homebrew-tap only, used solely for
+the cask push. No personal token is stored anywhere.
 
 Everything below is the **manual fallback** for when CI is unavailable.
 
