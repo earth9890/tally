@@ -1,0 +1,120 @@
+name: Release
+
+# On every merge to master: if package.json's version has no release yet,
+# build both mac arches, publish the GitHub release, and bump the Homebrew cask.
+# Merges that don't change the version (docs, refactors) skip everything.
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14 # arm64; electron-builder cross-builds x64 from here
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: v
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          # Injection guard: version is repo content and gets used in shell steps.
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version: $VERSION" >&2; exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if release already exists
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "v$VERSION already released — nothing to do."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.exists == 'false'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install build prerequisites
+        if: steps.gate.outputs.exists == 'false'
+        run: python3 -m pip install --break-system-packages setuptools
+
+      - name: Install dependencies
+        if: steps.gate.outputs.exists == 'false'
+        run: npm ci
+
+      - name: Build and upload draft release (arm64 + x64)
+        if: steps.gate.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npx electron-builder --mac --publish always
+
+      - name: Publish release
+        if: steps.gate.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          NOTES=$(git log -1 --pretty='%s%n%n%b')
+          gh release edit "v$VERSION" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft=false \
+            --title "Tally $VERSION" \
+            --notes "$NOTES"
+
+      - name: Update Homebrew cask
+        if: steps.gate.outputs.exists == 'false'
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          ARM=$(shasum -a 256 dist/Tally-"$VERSION"-arm64.dmg | awk '{print $1}')
+          X64=$(shasum -a 256 dist/Tally-"$VERSION"-x64.dmg | awk '{print $1}')
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/earth9890/homebrew-tap.git" tap
+          # Regenerate the cask wholesale — templating beats sed-in-place.
+          cat > tap/Casks/tally.rb <<EOF
+          cask "tally" do
+            arch arm: "arm64", intel: "x64"
+
+            version "$VERSION"
+            sha256 arm:   "$ARM",
+                   intel: "$X64"
+
+            url "https://github.com/earth9890/tally/releases/download/v#{version}/Tally-#{version}-#{arch}.dmg"
+            name "Tally"
+            desc "Local-first, automatic personal time tracker for the menu bar"
+            homepage "https://github.com/earth9890/tally"
+
+            livecheck do
+              url :url
+              strategy :github_latest
+            end
+
+            auto_updates true
+
+            app "Tally.app"
+
+            zap trash: [
+              "~/Library/Application Support/Tally",
+              "~/Library/Preferences/io.earth9890.tally.plist",
+              "~/Library/Caches/tally-updater",
+            ]
+          end
+          EOF
+          cd tap
+          git config user.name "tally-release-bot"
+          git config user.email "actions@github.com"
+          git add Casks/tally.rb
+          git commit -m "tally $VERSION"
+          git push origin master

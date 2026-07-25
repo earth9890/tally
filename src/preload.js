@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('api', {
   chooseSound: () => ipcRenderer.invoke('chooseSound'),
   openRepo: () => ipcRenderer.invoke('openRepo'),
   onPopoverRefresh: (cb) => ipcRenderer.on('popover:refresh', () => cb()),
+  resizePopover: (h) => ipcRenderer.invoke('popover:resize', h),
   getReminders: () => ipcRenderer.invoke('getReminders'),
   saveReminder: (r) => ipcRenderer.invoke('saveReminder', r),
   deleteReminder: (id) => ipcRenderer.invoke('deleteReminder', id),

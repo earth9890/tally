@@ -2,6 +2,31 @@
 
 Everything required to ship a Tally release, from GitHub to Homebrew.
 
+## TL;DR — the normal flow (CI does the work)
+
+Releases are automated by `.github/workflows/release.yml`:
+
+```bash
+git checkout dev && git pull
+# ...make changes... bump "version" in package.json (e.g. 0.1.7 -> 0.1.8)
+git commit -am "..." && git push origin dev
+gh pr create --base master --title "Release 0.1.8" --body "..."
+gh pr merge --squash            # merge when ready
+```
+
+On merge to master the workflow: reads the version → if `v<ver>` isn't
+released yet → builds arm64 + x64 on a macOS runner → uploads + publishes the
+GitHub release → regenerates and pushes `homebrew-tap/Casks/tally.rb`.
+Merges without a version bump (docs, refactors) skip the release automatically.
+
+Branch rules: **master takes PRs only** (no direct commits), force pushes are
+blocked on all branches in both repos. Day-to-day work happens on `dev`.
+
+Secrets: `TAP_TOKEN` (Actions secret on earth9890/tally) — token with write
+access to earth9890/homebrew-tap, used only for the cask push.
+
+Everything below is the **manual fallback** for when CI is unavailable.
+
 ## Channels
 
 | Channel | What users do | What we maintain |
