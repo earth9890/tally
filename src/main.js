@@ -122,26 +122,20 @@ function togglePopover() {
 // (macOS applies updates only for signed builds; unsigned installs still get
 // the "update available" notification but must be replaced manually.)
 let updateReady = null;   // version string once an update is downloaded
-let updateManual = false; // Squirrel refused to install (signature mismatch) -> hand off to browser
 let _autoUpdater = null;
 
 function checkForUpdates() {
   if (!app.isPackaged) return;
   try { ({ autoUpdater: _autoUpdater } = require('electron-updater')); } catch (_) { return; }
+  // Squirrel's own install always fails on our ad-hoc builds (signature
+  // mismatch) — we only use electron-updater for check + verified download;
+  // installation is ours (see installUpdate). Errors from the native side
+  // are expected noise.
+  _autoUpdater.on('error', () => {});
   _autoUpdater.on('update-downloaded', (info) => {
     updateReady = info.version;
     refreshTray();
     if (pop && !pop.isDestroyed()) pop.webContents.send('popover:refresh');
-  });
-  // Squirrel validates the update's code signature against the running app's.
-  // Builds signed differently (e.g. local cert vs CI) fail here — auto-install
-  // is impossible, so degrade to "open the release page" instead of a button
-  // that silently does nothing.
-  _autoUpdater.on('error', () => {
-    if (updateReady && !updateManual) {
-      updateManual = true;
-      if (pop && !pop.isDestroyed()) pop.webContents.send('popover:refresh');
-    }
   });
   _autoUpdater.checkForUpdatesAndNotify().catch(() => {});
   setInterval(() => _autoUpdater.checkForUpdatesAndNotify().catch(() => {}), 60 * 60 * 1000);
@@ -299,7 +293,6 @@ function registerIpc() {
       tracking: tracker.isRunning(),
       goalHours: goal ? goal.interval_hours : 8,
       updateReady,
-      updateManual,
       version: app.getVersion(),
     };
   });
@@ -309,20 +302,52 @@ function registerIpc() {
     if (pop && !pop.isDestroyed() && h > 0) pop.setSize(300, Math.ceil(h) + 16, false);
   });
   ipcMain.handle('quit', () => { tracker.stop(); app.quit(); });
-  ipcMain.handle('installUpdate', () => {
+  // Custom installer: Squirrel.Mac refuses updates whose code signature
+  // differs from the running app's, and ad-hoc CI builds differ every time.
+  // So we bypass Squirrel: electron-updater has already downloaded the zip
+  // AND verified its SHA-512 against latest-mac.yml (integrity holds); we
+  // unpack it ourselves and hand off to a detached script that waits for
+  // this process to exit, swaps /Applications/Tally.app, and relaunches.
+  ipcMain.handle('installUpdate', async () => {
     if (!updateReady) return;
-    if (updateManual || !_autoUpdater) {
-      // Auto-install impossible (signature mismatch) — open the release page.
+    const fallback = () => {
       shell.openExternal(`https://github.com/earth9890/tally/releases/tag/v${updateReady}`);
       if (pop) pop.hide();
-      return;
-    }
-    // Do NOT stop the tracker here: if quitAndInstall fails, the app keeps
-    // running and tracking must keep running with it (the before-quit hook
-    // stops it when the quit actually happens).
-    try { _autoUpdater.quitAndInstall(); } catch (_) {
-      updateManual = true;
-      if (pop && !pop.isDestroyed()) pop.webContents.send('popover:refresh');
+    };
+    try {
+      const appPath = path.resolve(app.getPath('exe'), '..', '..', '..'); // .../Tally.app
+      if (!appPath.endsWith('.app')) return fallback();
+      const pending = path.join(app.getPath('userData'), '..', '..', 'Caches', 'tally-updater', 'pending');
+      const zip = fs.readdirSync(pending).map((f) => path.join(pending, f))
+        .find((f) => f.endsWith('.zip') && f.includes(updateReady));
+      if (!zip) return fallback();
+
+      // Unpack while still running — fail here and nothing was touched.
+      const stage = path.join(os.tmpdir(), 'tally-update-stage');
+      fs.rmSync(stage, { recursive: true, force: true });
+      fs.mkdirSync(stage, { recursive: true });
+      await new Promise((resolve, reject) => {
+        execFile('ditto', ['-x', '-k', zip, stage], (err) => (err ? reject(err) : resolve()));
+      });
+      const newApp = path.join(stage, 'Tally.app');
+      if (!fs.existsSync(path.join(newApp, 'Contents', 'Info.plist'))) return fallback();
+
+      // Detached swapper: wait for us to exit, replace, de-quarantine, relaunch.
+      const script = `
+        while kill -0 ${process.pid} 2>/dev/null; do sleep 0.2; done
+        rm -rf "${appPath}"
+        mv "${newApp}" "${appPath}"
+        xattr -rd com.apple.quarantine "${appPath}" 2>/dev/null
+        open "${appPath}"
+      `;
+      const child = require('child_process').spawn('/bin/sh', ['-c', script], {
+        detached: true, stdio: 'ignore',
+      });
+      child.unref();
+      tracker.stop();
+      app.quit();
+    } catch (_) {
+      fallback();
     }
   });
   ipcMain.handle('about', () => ({
