@@ -41,11 +41,7 @@ function paint() {
 
   const uw = $('p-update-wrap');
   uw.hidden = !data.updateReady;
-  if (data.updateReady) {
-    $('p-update').textContent = data.updateManual
-      ? `Download v${data.updateReady} (opens browser)`
-      : `Install v${data.updateReady} & Relaunch`;
-  }
+  if (data.updateReady) $('p-update').textContent = `Install v${data.updateReady} & Relaunch`;
   if (data.version) $('p-quit').textContent = `Quit Tally · v${data.version}`;
 
   // Row set may have changed (update row) — tell main to fit the window.
