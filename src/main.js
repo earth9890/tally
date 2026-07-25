@@ -141,6 +141,33 @@ function checkForUpdates() {
   setInterval(() => _autoUpdater.checkForUpdatesAndNotify().catch(() => {}), 60 * 60 * 1000);
 }
 
+// One-time heal for users who updated through the ad-hoc-signed era
+// (0.2.0–0.2.4): each of those builds had a different code identity, so macOS
+// piled up stale/denied permission rows for our bundle id and re-prompted on
+// every launch. Wipe our own rows once; the user grants once against the now
+// stable signed identity and is never asked again. Fresh installs (no tracked
+// data yet) skip — they have no stale rows.
+function tccMigration() {
+  if (!app.isPackaged) return;
+  if (db.getSettings().tcc_reset_025 === '1') return;
+  db.setSetting('tcc_reset_025', '1');
+  const existingUser = db.seenApps().length > 0;
+  if (!existingUser) return;
+  execFile('tccutil', ['reset', 'Accessibility', 'io.earth9890.tally'], () => {
+    execFile('tccutil', ['reset', 'ScreenCapture', 'io.earth9890.tally'], () => {
+      try {
+        const n = new (require('electron').Notification)({
+          title: 'Tally — one-time permission refresh',
+          body: 'This update fixed permission handling. Click here, then re-enable Tally under Screen Recording and Accessibility.',
+        });
+        n.on('click', () =>
+          shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture'));
+        n.show();
+      } catch (_) {}
+    });
+  });
+}
+
 // Mirror the `launch_at_login` setting into the macOS login-item registration.
 // openAsHidden starts the app straight to the menu bar, no window.
 function syncLoginItem() {
@@ -404,6 +431,7 @@ app.whenReady().then(() => {
   });
 
   syncLoginItem();
+  tccMigration();
   checkForUpdates();
   reminders.start();
   if (db.getSettings().tracking !== '0') tracker.start();
