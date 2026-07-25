@@ -26,6 +26,28 @@ Secrets: `TAP_DEPLOY_KEY` (Actions secret on earth9890/tally) — SSH deploy key
 whose write access is scoped to earth9890/homebrew-tap only, used solely for
 the cask push. No personal token is stored anywhere.
 
+## Security posture (validated 2026-07-25)
+
+- No secrets in either repo's git history (pattern-scanned, all commits).
+- CI's only stored secret is `TAP_DEPLOY_KEY` — SSH deploy key, write access
+  limited to homebrew-tap. Release uploads use GitHub's ephemeral per-run
+  `GITHUB_TOKEN` (repo-scoped, `contents: write` only).
+- Workflow hardening: version string regex-validated before shell use; all
+  `${{ }}` inputs passed via `env`; actions **pinned to commit SHAs**; GitHub's
+  SSH host keys **pinned** (no ssh-keyscan TOFU); workflow runs only on push to
+  master, so fork PRs never see secrets.
+- App hardening: `contextIsolation` on, `nodeIntegration` off, CSP on both
+  pages, all dynamic strings escaped, renderer can only open one fixed URL,
+  custom sound files validated (mp3 + ≤10s) in the main process.
+- Update integrity: electron-updater verifies each download against the SHA-512
+  in `latest-mac.yml`; only repo admins can touch releases, and branch rulesets
+  block history rewrites.
+- Dependency state: `npm audit` clean (0 vulnerabilities), `package-lock.json`
+  committed, CI installs with `npm ci` (exact lock).
+
+Re-validate after significant changes: secret-pattern scan of history, secret
+list, deploy-key scope, `npm audit`.
+
 Everything below is the **manual fallback** for when CI is unavailable.
 
 ## Channels

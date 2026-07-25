@@ -15,7 +15,8 @@ jobs:
   release:
     runs-on: macos-14 # arm64; electron-builder cross-builds x64 from here
     steps:
-      - uses: actions/checkout@v4
+      # Actions pinned to commit SHAs — a hijacked version tag can't run here.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Read version
         id: v
@@ -40,7 +41,7 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         if: steps.gate.outputs.exists == 'false'
         with:
           node-version: 22
@@ -85,8 +86,13 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "$TAP_DEPLOY_KEY" > ~/.ssh/tap_key
           chmod 600 ~/.ssh/tap_key
-          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
-          export GIT_SSH_COMMAND="ssh -i ~/.ssh/tap_key -o IdentitiesOnly=yes"
+          # GitHub's published host keys (api.github.com/meta), pinned — no
+          # trust-on-first-use ssh-keyscan.
+          cat >> ~/.ssh/known_hosts <<'HOSTS'
+          github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+          github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+          HOSTS
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/tap_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
           git clone git@github.com:earth9890/homebrew-tap.git tap
           # Regenerate the cask wholesale — templating beats sed-in-place.
           cat > tap/Casks/tally.rb <<EOF
