@@ -55,11 +55,40 @@ jobs:
         if: steps.gate.outputs.exists == 'false'
         run: npm ci
 
-      - name: Build and upload draft release (arm64 + x64)
+      # Arch builds are fully serialized in separate invocations: a single
+      # dual-arch invocation lets the second arch's native rebuild race the
+      # first arch's file copy (shipped an x86_64 sqlite inside the arm64 dmg
+      # in 0.2.0-0.2.3). Each invocation also overwrites latest-mac.yml, so we
+      # merge the manifests and publish the assets ourselves.
+      - name: Build arm64
         if: steps.gate.outputs.exists == 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: npx electron-builder --mac --publish always
+        run: |
+          npx electron-builder --mac --arm64 --publish never
+          cp dist/latest-mac.yml dist/arm.yml
+
+      - name: Build x64
+        if: steps.gate.outputs.exists == 'false'
+        run: npx electron-builder --mac --x64 --publish never
+
+      - name: Merge update manifests
+        if: steps.gate.outputs.exists == 'false'
+        run: node scripts/merge-mac-yml.js dist/arm.yml dist/latest-mac.yml dist/latest-mac.yml
+
+      - name: Verify artifact architectures
+        if: steps.gate.outputs.exists == 'false'
+        run: |
+          set -e
+          for arch in arm64 x64; do
+            [ "$arch" = "arm64" ] && want="arm64" || want="x86_64"
+            zip=$(ls dist/Tally-*-"$arch".zip)
+            rm -rf /tmp/av && mkdir -p /tmp/av
+            unzip -qq "$zip" "Tally.app/Contents/Resources/app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node" -d /tmp/av
+            got=$(file /tmp/av/Tally.app/Contents/Resources/app.asar.unpacked/node_modules/better-sqlite3/build/Release/better_sqlite3.node)
+            echo "$zip -> $got"
+            echo "$got" | grep -q "$want" || { echo "ARCH MISMATCH in $zip (want $want)"; exit 1; }
+          done
+          grep -q "arm64.zip" dist/latest-mac.yml && grep -q "x64.zip" dist/latest-mac.yml \
+            || { echo "latest-mac.yml missing an arch"; exit 1; }
 
       - name: Publish release
         if: steps.gate.outputs.exists == 'false'
@@ -68,11 +97,11 @@ jobs:
           VERSION: ${{ steps.v.outputs.version }}
         run: |
           NOTES=$(git log -1 --pretty='%s%n%n%b')
-          gh release edit "v$VERSION" \
+          gh release create "v$VERSION" \
             --repo "$GITHUB_REPOSITORY" \
-            --draft=false \
             --title "Tally $VERSION" \
-            --notes "$NOTES"
+            --notes "$NOTES" \
+            dist/Tally-*.dmg dist/Tally-*.zip dist/*.blockmap dist/latest-mac.yml
 
       - name: Update Homebrew cask
         if: steps.gate.outputs.exists == 'false'
