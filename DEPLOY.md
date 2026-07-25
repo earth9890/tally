@@ -22,9 +22,15 @@ Merges without a version bump (docs, refactors) skip the release automatically.
 Branch rules: **master takes PRs only** (no direct commits), force pushes are
 blocked on all branches in both repos. Day-to-day work happens on `dev`.
 
-Secrets: `TAP_DEPLOY_KEY` (Actions secret on earth9890/tally) — SSH deploy key
-whose write access is scoped to earth9890/homebrew-tap only, used solely for
-the cask push. No personal token is stored anywhere.
+Secrets (Actions secrets on earth9890/tally):
+- `TAP_DEPLOY_KEY` — SSH deploy key, write access scoped to
+  earth9890/homebrew-tap only (cask push). No personal token stored anywhere.
+- `CSC_LINK` + `CSC_KEY_PASSWORD` — the maintainer's "Apple Development"
+  certificate (base64 .p12 + its password). Every build signs with this one
+  identity so macOS TCC grants (Accessibility / Screen Recording) persist
+  across updates. **Expires yearly** — renew in Xcode, re-export
+  (`security export -t identities -f pkcs12 …`), update both secrets. CI's
+  verify step fails the build if the team identity is missing.
 
 ## Security posture (validated 2026-07-25)
 
