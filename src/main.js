@@ -8,6 +8,7 @@ const {
 const db = require('./db');
 const tracker = require('./tracker');
 const reminders = require('./reminders');
+const agents = require('./agents');
 
 let tray = null;
 let win = null;
@@ -265,6 +266,9 @@ function registerIpc() {
       if (tracker.isRunning()) { tracker.stop(); tracker.start(); }
     }
     if (key === 'launch_at_login') syncLoginItem();
+    if (key === 'agent_watch') {
+      if (value === '1' || value === 1) agents.start(); else agents.stop();
+    }
     return true;
   });
 
@@ -325,6 +329,8 @@ function registerIpc() {
     return { path: file, name: path.basename(file) };
   });
 
+  ipcMain.handle('agents', () => ({ watching: agents.isRunning(), sessions: agents.getSessions() }));
+
   ipcMain.handle('getTracking', () => tracker.isRunning());
   ipcMain.handle('setTracking', (_e, on) => {
     if (on) { tracker.start(); db.setSetting('tracking', 1); }
@@ -350,6 +356,7 @@ app.whenReady().then(() => {
   checkForUpdates();
   reminders.start();
   if (db.getSettings().tracking !== '0') tracker.start();
+  if (db.getSettings().agent_watch === '1') agents.start();
 
   if (process.env.DT_SHOW) {
     createWindow();

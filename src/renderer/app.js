@@ -48,7 +48,7 @@ document.querySelectorAll('.nav button').forEach((b) => {
 });
 
 function load(tab) {
-  ({ dashboard: loadDashboard, history: loadHistory, categories: loadCategories, reminders: loadReminders, settings: loadSettings }[tab])();
+  ({ dashboard: loadDashboard, history: loadHistory, categories: loadCategories, reminders: loadReminders, agents: loadAgents, settings: loadSettings }[tab])();
 }
 
 // ---- dashboard ----------------------------------------------------------
@@ -330,6 +330,56 @@ function wireRow(el) {
     }
   }
 }
+
+// ---- agents ---------------------------------------------------------------
+
+function agoShort(ts) {
+  const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
+}
+
+async function loadAgents() {
+  const s = await dt.getSettings();
+  const sw = $('ag-watch');
+  sw.setAttribute('aria-checked', String(s.agent_watch === '1'));
+  sw.onclick = async () => {
+    const on = sw.getAttribute('aria-checked') !== 'true';
+    sw.setAttribute('aria-checked', String(on));
+    await dt.setSetting('agent_watch', on ? '1' : '0');
+    renderAgents();
+  };
+  renderAgents();
+}
+
+async function renderAgents() {
+  const { watching, sessions } = await dt.agents();
+  const box = $('ag-rows');
+  const empty = $('ag-empty');
+  if (!watching) {
+    box.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'Watching is off. Flip the switch to see live Claude Code / Codex sessions and get a shout when one finishes.';
+    return;
+  }
+  if (!sessions.length) {
+    box.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No agent sessions running right now. Start Claude Code or Codex in a terminal and it will show up here.';
+    return;
+  }
+  empty.hidden = true;
+  box.innerHTML = sessions.map((a) => `
+    <div class="agrow">
+      <span class="agtile ${a.tool}">${a.tool === 'claude' ? 'CL' : 'CX'}</span>
+      <span class="agname">${esc(a.project)}</span>
+      <span class="agstate ${a.state}"><i></i>${a.state === 'working' ? 'Working' : a.state === 'done' ? 'Done — waiting for you' : 'Idle'}</span>
+      <span class="agsince">${agoShort(a.since)}</span>
+    </div>`).join('');
+}
+
+setInterval(() => { if ($('agents').classList.contains('active')) renderAgents(); }, 5000);
 
 // ---- settings -----------------------------------------------------------
 

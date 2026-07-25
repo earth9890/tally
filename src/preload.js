@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('api', {
   installUpdate: () => ipcRenderer.invoke('installUpdate'),
   about: () => ipcRenderer.invoke('about'),
   chooseSound: () => ipcRenderer.invoke('chooseSound'),
+  agents: () => ipcRenderer.invoke('agents'),
   openRepo: () => ipcRenderer.invoke('openRepo'),
   onPopoverRefresh: (cb) => ipcRenderer.on('popover:refresh', () => cb()),
   resizePopover: (h) => ipcRenderer.invoke('popover:resize', h),

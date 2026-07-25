@@ -74,6 +74,7 @@ const DEFAULT_SETTINGS = {
   launch_at_login: '1',     // 1 = start automatically at login (default on)
   announce_voice: '1',      // 1 = speak reminders aloud (macOS `say`)
   custom_sounds: '0',       // 1 = per-reminder custom mp3s can be chosen/used
+  agent_watch: '0',         // 1 = watch Claude/Codex sessions, announce when done
 };
 
 const DEFAULT_REMINDERS = [
