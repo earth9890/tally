@@ -32,6 +32,13 @@ Vanilla JS everywhere. No React, no bundler, no chart lib — charts are CSS/SVG
 - Escape all dynamic strings with `esc()` before `innerHTML`.
 - Data stays local. No analytics, no network calls except the update check.
 - Commits: plain messages, **no Claude co-author trailer**.
+- **Branches:** work on `dev`; master takes **PRs only** (direct pushes are
+  rejected by a ruleset) and force pushes are blocked everywhere. Merging a PR
+  that bumps `package.json` version triggers the CI release (see DEPLOY.md);
+  merges without a bump are safe — CI skips.
+- **Secrets:** never write tokens/keys to files or commits. CI's only secret is
+  `TAP_DEPLOY_KEY`, an SSH deploy key scoped to homebrew-tap. Local gh token
+  stays in the keyring.
 
 ## Hard-won gotchas (do not rediscover these)
 
