@@ -23,6 +23,7 @@
         <button data-tab="history"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Timeline</button>
         <button data-tab="categories"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>Apps</button>
         <button data-tab="reminders"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Reminders</button>
+        <button data-tab="agents"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M8 4h8"/><circle cx="9" cy="13.5" r="1"/><circle cx="15" cy="13.5" r="1"/><path d="M9.5 17h5"/></svg>Agents</button>
         <button data-tab="settings"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>Settings</button>
       </nav>
 
@@ -142,6 +143,30 @@
           </div>
           <div id="rem-rows"></div>
           <button id="rem-add" class="btn-ghost">+ Add reminder</button>
+        </section>
+
+        <!-- Agents -->
+        <section id="agents" class="tab">
+          <p class="eyebrow">Agents</p>
+          <div class="rem-head">
+            <p class="hint" style="max-width:540px">Watches Claude Code and Codex CLI sessions on this Mac and announces when one finishes and is waiting for you. Detection reads their local session logs — nothing leaves this machine.</p>
+            <div class="rem-toggles">
+              <div class="speak" title="Poll running agent sessions every 5 seconds">
+                <button type="button" id="ag-watch" class="switch" role="switch" aria-checked="false"><span></span></button>
+                <span class="k">Watch agents</span>
+              </div>
+              <div class="speak" title="Blink the caps-lock light while an agent works. Heads-up: typing during an on-phase gives capitals — macOS ties the light to real caps state.">
+                <button type="button" id="ag-caps" class="switch" role="switch" aria-checked="true"><span></span></button>
+                <span class="k">Caps-lock light</span>
+              </div>
+              <div class="speak" title="Say aloud when an agent finishes">
+                <button type="button" id="ag-voice" class="switch" role="switch" aria-checked="false"><span></span></button>
+                <span class="k">Voice</span>
+              </div>
+            </div>
+          </div>
+          <div id="ag-rows"></div>
+          <p class="empty" id="ag-empty" hidden></p>
         </section>
 
         <!-- Settings -->

@@ -312,6 +312,25 @@ select:focus-visible { outline: 2px solid color-mix(in oklab, var(--accent) 50%,
 .rem .del { padding: 6px 10px; color: var(--faint); }
 .rem .del:hover { color: var(--coral); border-color: var(--coral); }
 
+/* ---- agents ------------------------------------------------------------ */
+.agrow { display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+  border: 1px solid var(--border); border-radius: var(--r2); margin-bottom: 8px;
+  background: var(--panel); box-shadow: var(--shadow-card); }
+.agtile { flex: none; width: 32px; height: 32px; border-radius: 9px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; letter-spacing: .02em; }
+.agtile.claude { background: var(--accent-soft); color: var(--accent-deep); }
+.agtile.codex { background: color-mix(in oklab, var(--teal) 16%, transparent); color: var(--teal); }
+.agname { flex: 1; font-weight: 550; font-size: 14px; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agstate { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); flex: none; }
+.agstate i { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+.agstate.working { color: var(--accent-deep); }
+.agstate.working i { background: var(--accent); animation: tlpulse 2s infinite; }
+.agstate.done { color: var(--green); }
+.agstate.done i { background: var(--green); }
+.agsince { font-family: var(--mono); font-size: 12px; color: var(--faint); flex: none; width: 56px; text-align: right; }
+
 /* ---- about ------------------------------------------------------------ */
 .about { display: flex; align-items: center; gap: 12px; margin-top: 28px; padding-top: 22px;
   border-top: 1px solid var(--border); }

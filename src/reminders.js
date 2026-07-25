@@ -61,7 +61,7 @@ function renderMessage(r, now) {
 
 function speak(text) {
   if (db.getSettings().announce_voice === '0') return;
-  try { execFile('say', [text]); } catch (_) { /* `say` unavailable */ }
+  try { execFile('say', [text], () => {}); } catch (_) { /* `say` unavailable */ }
 }
 
 // Fire a reminder: notification always; then its sound, else the spoken voice
@@ -71,7 +71,7 @@ function fire(r, now = new Date()) {
   try { new Notification({ title: r.label, body, silent: true }).show(); } catch (_) {}
   const snd = soundFor(r);
   if (snd) {
-    try { execFile('afplay', [snd]); } catch (_) { speak(body); }
+    try { execFile('afplay', [snd], () => {}); } catch (_) { speak(body); }
   } else {
     speak(body);
   }
