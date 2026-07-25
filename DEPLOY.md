@@ -127,9 +127,15 @@ release stops the rollout.
 
 ## Signing / notarization (future)
 
-Currently signed with a local identity, not notarized:
-- users right-click → Open on first launch
-- updates *notify* everywhere but may only auto-*apply* on the build machine
+CI builds are **ad-hoc signed**. Consequences (all verified in the field):
+- Squirrel refuses to auto-install an update whose signature differs from the
+  running app (`SQRLCodeSignatureErrorDomain`) — and ad-hoc signatures differ
+  **every build**, so auto-*install* never works; the app degrades to a
+  "Download vX (opens browser)" row (since 0.2.1). Downloads/notifications
+  still work.
+- Gatekeeper marks quarantined ad-hoc apps "damaged" on newer macOS. Fresh
+  installs: `brew install --cask earth9890/tap/tally --no-quarantine`, or
+  `xattr -rd com.apple.quarantine /Applications/Tally.app`.
 
 When an Apple Developer ID exists ($99/yr):
 1. Create a "Developer ID Application" certificate → Keychain

@@ -121,7 +121,8 @@ function togglePopover() {
 // packaged build — electron-updater needs the published latest-mac.yml + zip.
 // (macOS applies updates only for signed builds; unsigned installs still get
 // the "update available" notification but must be replaced manually.)
-let updateReady = null; // version string once an update is downloaded
+let updateReady = null;   // version string once an update is downloaded
+let updateManual = false; // Squirrel refused to install (signature mismatch) -> hand off to browser
 let _autoUpdater = null;
 
 function checkForUpdates() {
@@ -131,6 +132,16 @@ function checkForUpdates() {
     updateReady = info.version;
     refreshTray();
     if (pop && !pop.isDestroyed()) pop.webContents.send('popover:refresh');
+  });
+  // Squirrel validates the update's code signature against the running app's.
+  // Builds signed differently (e.g. local cert vs CI) fail here — auto-install
+  // is impossible, so degrade to "open the release page" instead of a button
+  // that silently does nothing.
+  _autoUpdater.on('error', () => {
+    if (updateReady && !updateManual) {
+      updateManual = true;
+      if (pop && !pop.isDestroyed()) pop.webContents.send('popover:refresh');
+    }
   });
   _autoUpdater.checkForUpdatesAndNotify().catch(() => {});
   setInterval(() => _autoUpdater.checkForUpdatesAndNotify().catch(() => {}), 60 * 60 * 1000);
@@ -288,6 +299,7 @@ function registerIpc() {
       tracking: tracker.isRunning(),
       goalHours: goal ? goal.interval_hours : 8,
       updateReady,
+      updateManual,
       version: app.getVersion(),
     };
   });
@@ -298,7 +310,20 @@ function registerIpc() {
   });
   ipcMain.handle('quit', () => { tracker.stop(); app.quit(); });
   ipcMain.handle('installUpdate', () => {
-    if (_autoUpdater && updateReady) { tracker.stop(); _autoUpdater.quitAndInstall(); }
+    if (!updateReady) return;
+    if (updateManual || !_autoUpdater) {
+      // Auto-install impossible (signature mismatch) — open the release page.
+      shell.openExternal(`https://github.com/earth9890/tally/releases/tag/v${updateReady}`);
+      if (pop) pop.hide();
+      return;
+    }
+    // Do NOT stop the tracker here: if quitAndInstall fails, the app keeps
+    // running and tracking must keep running with it (the before-quit hook
+    // stops it when the quit actually happens).
+    try { _autoUpdater.quitAndInstall(); } catch (_) {
+      updateManual = true;
+      if (pop && !pop.isDestroyed()) pop.webContents.send('popover:refresh');
+    }
   });
   ipcMain.handle('about', () => ({
     version: app.getVersion(),
