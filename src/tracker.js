@@ -24,13 +24,7 @@ async function activeWin() {
     _activeWindow = mod.activeWindow;
   }
   const granted = systemPreferences.getMediaAccessStatus('screen') === 'granted';
-  // accessibilityPermission:false always — get-windows would otherwise raise
-  // the macOS "control this computer" prompt, and because ad-hoc builds change
-  // code identity every update, macOS re-asks after each one. Accessibility is
-  // only used for tab URLs in some browsers; app/title need Screen Recording.
-  return _activeWindow(granted
-    ? { accessibilityPermission: false }
-    : { accessibilityPermission: false, screenRecordingPermission: false });
+  return _activeWindow(granted ? undefined : { screenRecordingPermission: false });
 }
 
 const MAX_SEGMENT_MS = 60 * 1000; // force-flush a running segment after 60s
