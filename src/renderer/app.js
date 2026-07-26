@@ -353,7 +353,7 @@ async function loadAgents() {
     };
   };
   wire('ag-watch', 'agent_watch', '0');
-  wire('ag-caps', 'agent_caps', '1');
+  wire('ag-caps', 'agent_caps', '0');
   wire('ag-voice', 'agent_voice', '0');
   renderAgents();
 }
