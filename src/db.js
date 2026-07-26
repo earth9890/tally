@@ -75,7 +75,7 @@ const DEFAULT_SETTINGS = {
   announce_voice: '1',      // 1 = speak reminders aloud (macOS `say`)
   custom_sounds: '0',       // 1 = per-reminder custom mp3s can be chosen/used
   agent_watch: '0',         // 1 = watch Claude/Codex sessions, announce when done
-  agent_caps: '1',          // 1 = blink caps-lock LED while an agent works (needs agent_watch)
+  agent_caps: '0',          // 1 = blink caps-lock LED while an agent works (needs agent_watch)
   agent_voice: '0',         // 1 = speak when an agent finishes (needs agent_watch)
 };
 
