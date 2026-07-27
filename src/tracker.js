@@ -63,8 +63,19 @@ function flush(endTs) {
   current = null;
 }
 
+let lastTick = 0;
+
 async function tick() {
   const now = Date.now();
+  // Heartbeat rule (ActivityWatch's pulsetime model): a segment only grows
+  // while ticks are actually observed. If ticks stopped for any reason —
+  // sleep the event handlers missed, a hang, timer coalescing — close the
+  // segment at the last observation instead of spanning the gap.
+  if (lastTick && current && now - lastTick > cfg.pollMs * 3 + 2000) {
+    flush(lastTick + cfg.pollMs);
+    current = null;
+  }
+  lastTick = now;
   const idleSec = powerMonitor.getSystemIdleTime();
   const isIdle = idleSec >= cfg.idleThresholdSec;
 
