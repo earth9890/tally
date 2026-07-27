@@ -77,7 +77,7 @@ const DEFAULT_CATEGORIES = {
 };
 
 const DEFAULT_SETTINGS = {
-  idle_threshold: '300',    // seconds without input -> idle
+  idle_threshold: '180',    // seconds without input -> idle (DeskTime/ActivityWatch default)
   poll_interval: '3',       // seconds between samples
   tracking: '1',            // 1 = tracking, 0 = paused
   launch_at_login: '1',     // 1 = start automatically at login (default on)
@@ -109,6 +109,15 @@ function seedDefaults() {
   const insSet = db.prepare(
     'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
   for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) insSet.run(k, v);
+
+  // One-time: move installs still on the old 5-min idle default down to the new
+  // 3-min default (matches DeskTime/ActivityWatch). Only the exact old value is
+  // touched, so a user's custom threshold is never overwritten; the flag makes
+  // it run once, so a deliberate 300 set later still sticks.
+  if (getSettings().idle_default_180 !== '1') {
+    if (getSettings().idle_threshold === '300') setSetting('idle_threshold', '180');
+    setSetting('idle_default_180', '1');
+  }
 
   // Seed reminders once, so user edits/deletions survive restarts.
   if (getSettings().reminders_seeded !== '1') {
