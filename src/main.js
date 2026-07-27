@@ -91,6 +91,9 @@ function createPopover() {
     width: 300, height: 264, show: false, frame: false, transparent: true,
     resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true,
     fullscreenable: false, hasShadow: false,
+    // NSPanel: can become key (so an outside click fires `blur` → hide, like a
+    // real menu) WITHOUT activating the app or yanking the user to Tally's Space.
+    type: 'panel',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true, nodeIntegration: false,
@@ -113,7 +116,7 @@ function togglePopover() {
   const x = Math.round(tb.x + tb.width / 2 - pb.width / 2);
   const y = Math.round(tb.y + tb.height + 2);
   pop.setPosition(x, y, false);
-  pop.showInactive(); // don't focus → don't activate Tally / switch Space
+  pop.show(); // key window (panel, non-activating) → blur closes on outside click
   pop.webContents.send('popover:refresh'); // paint() reports height back → resize
 }
 
@@ -175,7 +178,44 @@ function syncLoginItem() {
   app.setLoginItemSettings({ openAtLogin: on, openAsHidden: true });
 }
 
+// Electron's Tray uses the default autosave name "Item-0", so macOS persists
+// this item's slot + visibility under generic keys that go stale and never
+// self-heal: a bogus "Preferred Position" (<=0 or past the right screen edge)
+// parks the icon off-screen / behind the notch, and a persisted "VisibleCC = 0"
+// (written when the item once got culled — e.g. VSCode's long menu crowds the
+// notch) keeps it hidden for good. Clear the stale keys before the Tray is
+// created, mirroring steipete/CodexBar's PlacementPreflight + VisibilityRepair.
+// ponytail: heuristic + `defaults` CLI (no NSUserDefaults API in Electron). If
+// the CLI write races cfprefsd, a relaunch heals it; move to a native addon if
+// that ever proves flaky.
+function repairStatusItemDefaults() {
+  if (process.platform !== 'darwin') return;
+  const { execFileSync } = require('child_process');
+  const { screen } = require('electron');
+  const DOMAIN = 'io.earth9890.tally';
+  const read = (key) => {
+    try { return execFileSync('defaults', ['read', DOMAIN, key], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); }
+    catch (_) { return null; } // key absent
+  };
+  const del = (key) => { try { execFileSync('defaults', ['delete', DOMAIN, key]); } catch (_) {} };
+
+  const posKey = 'NSStatusItem Preferred Position Item-0';
+  const pos = parseFloat(read(posKey));
+  if (Number.isFinite(pos)) {
+    const maxRight = Math.max(...screen.getAllDisplays().map((d) => d.bounds.x + d.bounds.width));
+    if (pos <= 0 || pos > maxRight + 512) del(posKey);
+  }
+
+  // Heal a stuck "hidden" once only — never fight a user who deliberately hides
+  // Tally via a menu-bar manager (Ice/Bartender) on later launches.
+  if (db.getSettings().statusitem_vis_repair !== '1') {
+    if (read('NSStatusItem VisibleCC Item-0') === '0') del('NSStatusItem VisibleCC Item-0');
+    db.setSetting('statusitem_vis_repair', '1');
+  }
+}
+
 function createTray() {
+  repairStatusItemDefaults();
   // Tally mark as a template image (auto-tinted for light/dark menu bar) + the
   // running total as the title next to it.
   let img = nativeImage.createEmpty();
