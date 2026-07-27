@@ -188,6 +188,18 @@ function insertSegment(seg) {
   `).run(seg);
 }
 
+// Back-date an idle timeout (ActivityWatch's last-input model): the active
+// segments logged during the [fromTs, now] inactivity grace were really AFK, so
+// flip them to idle and totals stop counting away-time as work. Idle time is
+// idle whatever app was frontmost, so normalise to the 'Idle' convention. Only
+// touches idle=0 rows at/after fromTs — fromTs = now - real-seconds-since-input,
+// so a manual lock (tiny gap) reclaims nothing and real work is never eaten.
+function reclaimActiveAsIdle(fromTs) {
+  db.prepare(
+    "UPDATE segments SET app='Idle', title=NULL, url=NULL, idle=1 WHERE idle=0 AND start_ts >= ?"
+  ).run(fromTs);
+}
+
 // ---- settings -----------------------------------------------------------
 
 function getSettings() {
@@ -290,6 +302,7 @@ function seenApps() {
 module.exports = {
   init,
   insertSegment,
+  reclaimActiveAsIdle,
   upsertAppMeta,
   getAppPaths,
   getReminders,

@@ -107,6 +107,16 @@ async function tick() {
     }
   }
 
+  // Idle-onset back-date (ActivityWatch's last-input model): when an active
+  // segment flips to idle, the grace between the real last input and now was
+  // actually AFK, not work — but ticks kept booking it as active. Reclaim that
+  // window so totals don't count away-time as work. `idleSec` is the true time
+  // since input, so this self-adjusts and can't eat real work: a manual lock
+  // (idleSec ~0) reclaims nothing; a timeout (idleSec ~threshold) reclaims just
+  // the grace. Lock/suspend already null `current`, so this only fires on a
+  // genuine inactivity timeout.
+  const idleOnset = current && !current.idle && sample.idle;
+
   const changed = !current
     || current.app !== sample.app
     || current.title !== sample.title
@@ -117,6 +127,7 @@ async function tick() {
 
   if (changed) {
     flush(now);
+    if (idleOnset) db.reclaimActiveAsIdle(now - idleSec * 1000);
     current = { ...sample, start: now };
     emit();
   } else if (capped) {
