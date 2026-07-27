@@ -45,7 +45,10 @@ function emit() { for (const fn of listeners) fn(current); }
 
 function flush(endTs) {
   if (!current) return;
-  const duration = Math.round((endTs - current.start) / 1000);
+  // Clamp: timers don't fire during sleep, so a wake-up flush can span the
+  // whole nap — without this, one segment silently books hours of "work".
+  const maxSec = Math.round(MAX_SEGMENT_MS / 1000 + (2 * cfg.pollMs) / 1000);
+  const duration = Math.min(Math.round((endTs - current.start) / 1000), maxSec);
   if (duration >= 1) {
     db.insertSegment({
       app: current.app,
@@ -75,7 +78,10 @@ async function tick() {
     } catch (_) {
       // No focused window, or a transient failure — record as Unknown.
     }
-    if (win && win.owner && win.owner.name) {
+    if (win && win.owner && win.owner.name === 'loginwindow') {
+      // Locked screen — that's idle time, not work.
+      sample = { app: 'Idle', title: null, url: null, idle: true };
+    } else if (win && win.owner && win.owner.name) {
       sample = {
         app: win.owner.name,
         title: win.title || null,
@@ -108,9 +114,18 @@ async function tick() {
   }
 }
 
+let powerWired = false;
+
 function start() {
   if (timer) return;
   loadConfig();
+  // Close the running segment the moment the machine sleeps or locks —
+  // combined with the flush clamp this keeps naps out of tracked time.
+  if (!powerWired) {
+    powerWired = true;
+    powerMonitor.on('suspend', () => { flush(Date.now()); current = null; });
+    powerMonitor.on('lock-screen', () => { flush(Date.now()); current = null; });
+  }
   timer = setInterval(() => { tick().catch(() => {}); }, cfg.pollMs);
   tick().catch(() => {});
 }

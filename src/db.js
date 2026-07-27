@@ -55,6 +55,15 @@ function init() {
   // Migration: per-reminder custom sound path (added after v0.1.5).
   try { db.exec('ALTER TABLE reminders ADD COLUMN sound TEXT'); } catch (_) { /* exists */ }
 
+  // Heal sleep/lock artifacts (pre-0.2.8): lock-screen time recorded as work,
+  // and wake-up flushes that booked whole naps into one segment. Idempotent.
+  try {
+    db.exec("UPDATE segments SET app='Idle', title=NULL, url=NULL, idle=1 WHERE app='loginwindow'");
+    // The active-segment cap has always been 60s + poll jitter; anything
+    // beyond ~70s is a suspended-timer artifact, not real activity.
+    db.exec('UPDATE segments SET duration=66 WHERE idle=0 AND duration > 70');
+  } catch (_) { /* best effort */ }
+
   seedDefaults();
   return db;
 }
