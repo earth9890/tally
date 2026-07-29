@@ -137,15 +137,39 @@ async function tick() {
 }
 
 let powerWired = false;
+let wantTracking = false; // user intent — survives sleep pauses, gates auto-resume
+
+// System sleep: stop polling entirely (not just flush). macOS wakes the machine
+// for ~30s every ~15 min while asleep (dark wake / Power Nap); if the timer keeps
+// running it logs a phantom idle blip on every one. suspend/resume bracket the
+// whole sleep — dark wakes fire no resume — so a cleared timer stays dead through
+// them and the sleep is simply untracked. Matches Tockler's approach. Idempotent:
+// safe against the duplicate suspend/resume events macOS sometimes emits.
+function pausePolling() {
+  if (timer) { clearInterval(timer); timer = null; }
+  flush(Date.now());
+  current = null;
+}
+
+function resumePolling() {
+  if (timer || !wantTracking) return; // already polling, or user paused → stay off
+  lastTick = 0;                       // clean restart, no stale-gap heartbeat misfire
+  timer = setInterval(() => { tick().catch(() => {}); }, cfg.pollMs);
+  tick().catch(() => {});
+}
 
 function start() {
   if (timer) return;
   loadConfig();
-  // Close the running segment the moment the machine sleeps or locks —
-  // combined with the flush clamp this keeps naps out of tracked time.
+  wantTracking = true;
   if (!powerWired) {
     powerWired = true;
-    powerMonitor.on('suspend', () => { flush(Date.now()); current = null; });
+    // Sleep pauses polling; wake (or unlock, as a redundant wake signal) resumes.
+    powerMonitor.on('suspend', pausePolling);
+    powerMonitor.on('resume', resumePolling);
+    powerMonitor.on('unlock-screen', resumePolling);
+    // Locked but awake is still idle time, not sleep — keep polling, just close
+    // the running segment so the lock moment isn't booked to the last app.
     powerMonitor.on('lock-screen', () => { flush(Date.now()); current = null; });
   }
   timer = setInterval(() => { tick().catch(() => {}); }, cfg.pollMs);
@@ -153,6 +177,7 @@ function start() {
 }
 
 function stop() {
+  wantTracking = false;
   if (timer) { clearInterval(timer); timer = null; }
   flush(Date.now());
   current = null;
