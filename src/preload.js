@@ -5,7 +5,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('api', {
   summary: (range) => ipcRenderer.invoke('summary', range),
   timeline: (day) => ipcRenderer.invoke('timeline', day),
-  week: () => ipcRenderer.invoke('week'),
+  week: (from) => ipcRenderer.invoke('week', from),
   seenApps: () => ipcRenderer.invoke('seenApps'),
   getCategories: () => ipcRenderer.invoke('getCategories'),
   setCategory: (app, prod) => ipcRenderer.invoke('setCategory', { app, prod }),

@@ -165,10 +165,26 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
 .week { display: flex; align-items: flex-end; gap: 14px; height: 170px; }
 .week .bar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 9px; height: 100%; justify-content: flex-end; }
 .week .val { font-family: var(--mono); font-size: 11px; color: var(--faint); height: 13px; }
-.week .col { width: 100%; max-width: 34px; background: var(--track); border-radius: 7px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; transition: height .6s var(--ease); }
+.week .col { width: 100%; max-width: 34px; min-height: 5px; background: var(--track); border-radius: 7px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; transition: height .6s var(--ease); }
 .week .col .prod { background: var(--accent); border-radius: 7px; transition: height .6s var(--ease); }
 .week .lbl { font-size: 12px; font-weight: 500; color: var(--muted); }
 .week .bar.today .lbl { color: var(--ink); font-weight: 600; }
+.week .bar.pick { cursor: pointer; }
+.week .bar.pick:hover .col { filter: brightness(.96); }
+.week .bar.pick:hover .lbl { color: var(--ink); }
+.week .bar.sel .col { box-shadow: inset 0 0 0 2px var(--accent-deep); }
+.week .bar.sel .lbl { color: var(--accent-deep); font-weight: 600; }
+.week .bar.sel .val { color: var(--accent-deep); }
+
+/* weekly report (timeline tab) */
+.wkcard .wkstats { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 22px; }
+.wkcard .wkbig .v { font-family: var(--num); font-size: clamp(32px, 4.4vw, 42px); font-weight: 600; letter-spacing: -1.6px; line-height: 1; }
+.wkcard .wkbig .l { font-size: 12px; color: var(--faint); margin-top: 7px; }
+.wkcard .wktrio { display: flex; gap: 30px; }
+.wkcard .wktrio .v { font-family: var(--num); font-size: 19px; font-weight: 600; letter-spacing: -0.5px; }
+.wkcard .wktrio .v.acc { color: var(--accent-deep); }
+.wkcard .wktrio .l { font-size: 11px; color: var(--faint); margin-top: 5px; }
+.wkcard .wkhint { font-size: 12px; color: var(--faint); margin-top: 16px; }
 
 /* donut */
 .donut-wrap { display: flex; align-items: center; gap: 18px; }
@@ -204,8 +220,44 @@ input[type=date], input[type=number] {
   padding: 7px 10px; font-family: var(--mono); letter-spacing: -0.01em;
 }
 input:focus-visible { outline: 2px solid color-mix(in oklab, var(--accent) 50%, transparent); outline-offset: 1px; border-color: var(--accent); }
-#timeline { display: flex; width: 100%; height: 40px; border-radius: var(--r3); overflow: hidden; background: var(--track); border: 1px solid var(--border); }
-#timeline .seg { height: 100%; }
+
+/* day stepper: < [date] > Today */
+.daynav { position: relative; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.daynav .navbtn {
+  flex: none; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-2); background: var(--panel); color: var(--muted);
+  border-radius: var(--r3); cursor: pointer; padding: 0;
+  transition: color .12s var(--ease), border-color .12s var(--ease), background .12s var(--ease), transform .08s;
+}
+.daynav .navbtn svg { width: 16px; height: 16px; }
+.daynav .navbtn:hover:not(:disabled) { color: var(--accent-deep); border-color: var(--accent); background: var(--accent-soft); }
+.daynav .navbtn:active:not(:disabled) { transform: scale(.94); }
+.daynav .daylabel {
+  display: inline-flex; align-items: center; gap: 9px; height: 32px; padding: 0 13px;
+  font: inherit; font-weight: 550; font-size: 13.5px; color: var(--ink); cursor: pointer;
+  background: var(--panel); border: 1px solid var(--border-2); border-radius: var(--r3);
+  min-width: 210px; justify-content: center;
+  transition: border-color .12s var(--ease), color .12s var(--ease);
+}
+.daynav .daylabel svg { width: 15px; height: 15px; color: var(--faint); flex: none; }
+.daynav .daylabel:hover { border-color: var(--accent); }
+.daynav .daylabel:hover svg { color: var(--accent-deep); }
+/* Present but invisible: it owns the value + the native calendar popup
+   (opened via showPicker() from the label button). */
+.dhidden { position: absolute; left: 46px; bottom: 0; width: 1px; height: 1px;
+  opacity: 0; pointer-events: none; border: none; padding: 0; }
+.btn-chip {
+  height: 32px; padding: 0 14px; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--border-2); background: var(--panel); color: var(--muted);
+  border-radius: var(--r3); transition: color .12s var(--ease), border-color .12s var(--ease), background .12s var(--ease);
+}
+.btn-chip:hover:not(:disabled) { color: var(--accent-deep); border-color: var(--accent); background: var(--accent-soft); }
+.daynav .navbtn:disabled, .btn-chip:disabled { opacity: .38; cursor: default; }
+.daynav .dsum { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--faint); }
+.daynav :focus-visible { outline: 2px solid color-mix(in oklab, var(--accent) 50%, transparent); outline-offset: 1px; }
+
+#timeline { position: relative; width: 100%; height: 40px; border-radius: var(--r3); overflow: hidden; background: var(--track); border: 1px solid var(--border); }
+#timeline .seg { position: absolute; top: 0; bottom: 0; }
 #timeline .seg.productive { background: var(--accent); }
 #timeline .seg.unproductive { background: var(--coral); }
 #timeline .seg.neutral { background: var(--subtle); }
