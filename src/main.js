@@ -303,14 +303,17 @@ function registerIpc() {
     return db.segmentsBetween(from, from + DAY_MS);
   });
 
-  ipcMain.handle('week', () => {
-    const today = startOfDay();
-    const from = today - 6 * DAY_MS;
+  // 7 consecutive days starting at `from` (a day's start_ts); defaults to the
+  // last 7 days ending today. Walks midnight to midnight so a DST day still
+  // lines up with its own date.
+  ipcMain.handle('week', (_e, from) => {
     const days = [];
+    let dayStart = startOfDay(new Date(from || Date.now() - 6 * DAY_MS));
     for (let i = 0; i < 7; i++) {
-      const dayStart = from + i * DAY_MS;
-      const s = db.summary(dayStart, dayStart + DAY_MS);
+      const next = startOfDay(new Date(dayStart + 36 * 60 * 60 * 1000));
+      const s = db.summary(dayStart, next);
       days.push({ date: dayStart, active: s.total, productive: s.productive });
+      dayStart = next;
     }
     return days;
   });

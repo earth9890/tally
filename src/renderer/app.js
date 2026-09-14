@@ -68,7 +68,7 @@ async function loadDashboard() {
 
   drawDonut(s);
   drawUsage(apps);
-  drawWeek(await dt.week());
+  drawWeek(await dt.week(), $('weekChart'), $('week-sub'));
   $('content').scrollTop = 0;
 }
 
@@ -113,54 +113,106 @@ function drawUsage(apps) {
   }).join('');
 }
 
-function drawWeek(days) {
+// Bars for 7 days. `subEl` gets the "Nh tracked" caption when present; passing
+// `selected` (a day start_ts) marks that bar and makes every bar click-to-open.
+function drawWeek(days, el, subEl, selected) {
   const max = Math.max(1, ...days.map((d) => d.active));
-  const totalH = days.reduce((t, d) => t + d.active, 0) / 3600;
-  $('week-sub').textContent = totalH ? `${totalH.toFixed(1)}h tracked · amber = productive` : '';
-  $('weekChart').innerHTML = days.map((d, i) => {
+  const today = dayStart(Date.now());
+  if (subEl) {
+    const totalH = days.reduce((t, d) => t + d.active, 0) / 3600;
+    subEl.textContent = totalH ? `${totalH.toFixed(1)}h tracked · amber = productive` : '';
+  }
+  el.innerHTML = days.map((d) => {
     const colH = (d.active / max) * 100;
     const prodH = d.active ? (d.productive / d.active) * 100 : 0;
-    const isToday = i === days.length - 1;
     const hrs = d.active / 3600;
     const lbl = new Date(d.date).toLocaleDateString(undefined, { weekday: 'short' });
-    return `<div class="bar ${isToday ? 'today' : ''}">
+    const cls = [d.date === today ? 'today' : '', selected == null ? '' : 'pick',
+      d.date === selected ? 'sel' : ''].filter(Boolean).join(' ');
+    return `<div class="bar ${cls}" data-day="${d.date}" title="${esc(new Date(d.date).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' }) + '  ' + fmt(d.active))}">
       <span class="val">${hrs >= 0.1 ? hrs.toFixed(1) : ''}</span>
       <span class="col" style="height:0%" data-h="${colH}"><i class="prod" style="height:${prodH}%"></i></span>
       <span class="lbl">${lbl}</span>
     </div>`;
   }).join('');
   requestAnimationFrame(() => {
-    document.querySelectorAll('.week .col').forEach((c) => { c.style.height = `${c.dataset.h}%`; });
+    el.querySelectorAll('.col').forEach((c) => { c.style.height = `${c.dataset.h}%`; });
   });
+  if (selected != null) {
+    el.querySelectorAll('.bar').forEach((b) => { b.onclick = () => setDay(Number(b.dataset.day)); });
+  }
 }
 
 // ---- timeline (history) -------------------------------------------------
 
+const DAY_MS = 24 * 3600 * 1000;
+
+function dayStart(ts) {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+function mondayOf(ts) {
+  const d = new Date(dayStart(ts));
+  return dayStart(d.getTime() - ((d.getDay() + 6) % 7) * DAY_MS);
+}
 function toDateInput(ts) {
   const d = new Date(ts);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+let selDay = dayStart(Date.now());
+
 async function loadHistory() {
-  const el = $('h-date');
-  if (!el.value) el.value = toDateInput(Date.now());
-  await renderHistory();
-  el.onchange = renderHistory;
+  $('h-prev').onclick = () => setDay(selDay - DAY_MS);
+  $('h-next').onclick = () => setDay(selDay + DAY_MS);
+  $('h-today').onclick = () => setDay(Date.now());
+  $('h-pick').onclick = () => {
+    const el = $('h-date');
+    try { el.showPicker(); } catch (_) { el.focus(); }
+  };
+  $('h-date').onchange = () => {
+    const [y, m, d] = $('h-date').value.split('-').map(Number);
+    if (y) setDay(new Date(y, m - 1, d).getTime());
+  };
+  setDay(selDay);
+}
+
+// Single entry point for "show this day" — arrows, Today, the picker and the
+// week bars all route through it, so the label, the picker and both cards
+// never drift apart. Clamped to today: there is no data in the future.
+function setDay(ts) {
+  const today = dayStart(Date.now());
+  selDay = Math.min(dayStart(ts), today);
+  $('h-date').value = toDateInput(selDay);
+  $('h-label').textContent = dayLabel(selDay, today);
+  $('h-next').disabled = selDay >= today;
+  $('h-today').disabled = selDay === today;
+  renderHistory();
+  renderWeek();
+}
+
+function dayLabel(ts, today) {
+  const rel = ts === today ? 'Today' : ts === dayStart(today - DAY_MS) ? 'Yesterday' : '';
+  const full = new Date(ts).toLocaleDateString(undefined,
+    { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  return rel ? `${rel} · ${full}` : full;
 }
 
 async function renderHistory() {
-  const [y, m, d] = $('h-date').value.split('-').map(Number);
-  const dayStart = new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
-  const segs = await dt.timeline(dayStart);
+  const from = selDay;
+  const segs = await dt.timeline(from);
   const cats = await dt.getCategories();
 
-  const DAY = 24 * 3600 * 1000;
   let active = 0, idle = 0;
+  // Segments are placed at their real clock position, so the bar lines up with
+  // the 00/06/12/18/24 axis below it and gaps read as gaps.
   $('timeline').innerHTML = segs.map((seg) => {
     const category = seg.idle ? 'idle' : (cats[seg.app] || 'neutral');
     if (seg.idle) idle += seg.duration; else active += seg.duration;
-    const w = (seg.duration * 1000 / DAY) * 100;
-    return `<span class="seg ${category}" style="width:${w}%" title="${esc(hhmm(seg.start_ts) + '  ' + seg.app + '  ' + fmt(seg.duration))}"></span>`;
+    const left = ((seg.start_ts - from) / DAY_MS) * 100;
+    const w = ((seg.duration * 1000) / DAY_MS) * 100;
+    return `<span class="seg ${category}" style="left:${left.toFixed(4)}%;width:${Math.max(w, 0.06).toFixed(4)}%" title="${esc(hhmm(seg.start_ts) + '  ' + seg.app + '  ' + fmt(seg.duration))}"></span>`;
   }).join('');
   $('h-summary').textContent = segs.length ? `Active ${fmt(active)} · Idle ${fmt(idle)} · ${segs.length} segments` : 'No activity this day.';
 
@@ -170,8 +222,43 @@ async function renderHistory() {
       <span class="dur">${fmt(seg.duration)}</span>
       <span class="app">${esc(seg.app)}</span>
       <span class="sub">${esc(seg.url || seg.title || '')}</span>
-    </div>`).join('');
+    </div>`).join('') || '<p class="empty">Nothing recorded on this day.</p>';
 }
+
+// Mon→Sun week containing the selected day. Weekends count like any other day.
+async function renderWeek() {
+  const from = mondayOf(selDay);
+  const days = await dt.week(from);
+  const today = dayStart(Date.now());
+  const total = days.reduce((t, d) => t + d.active, 0);
+  const prod = days.reduce((t, d) => t + d.productive, 0);
+  // Average over days that have actually happened, so a Tuesday doesn't get
+  // divided by seven.
+  const elapsed = Math.max(1, days.filter((d) => d.date <= today).length);
+  const best = days.reduce((b, d) => (d.active > b.active ? d : b), days[0]);
+
+  const md = { day: 'numeric', month: 'short' };
+  $('wk-range').textContent = `${new Date(from).toLocaleDateString(undefined, md)} – ${new Date(days[6].date).toLocaleDateString(undefined, { ...md, year: 'numeric' })}`;
+  $('wk-total').textContent = fmt(total);
+  $('wk-avg').textContent = fmt(total / elapsed);
+  $('wk-prod').textContent = total ? `${Math.round((prod / total) * 100)}%` : '0%';
+  $('wk-best').textContent = best.active
+    ? `${new Date(best.date).toLocaleDateString(undefined, { weekday: 'short' })} · ${(best.active / 3600).toFixed(1)}h`
+    : '—';
+
+  drawWeek(days, $('wkChart'), null, selDay);
+}
+
+// ← / → step the day while the Timeline tab is open.
+document.addEventListener('keydown', (e) => {
+  if (!$('history').classList.contains('active')) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target.matches('input, select, textarea')) return;
+  if (e.key === 'ArrowLeft') setDay(selDay - DAY_MS);
+  else if (e.key === 'ArrowRight') setDay(selDay + DAY_MS);
+  else return;
+  e.preventDefault();
+});
 
 // ---- apps / categories --------------------------------------------------
 
