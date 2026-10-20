@@ -107,6 +107,12 @@ async function tick() {
     }
   }
 
+  // stop()/pausePolling() may have fired while we were awaiting activeWin().
+  // They already flushed and nulled `current`; writing it again here would
+  // resurrect a segment with no timer left to close it, and it would leak into
+  // the next start().
+  if (!timer) return;
+
   // Idle-onset back-date (ActivityWatch's last-input model): when an active
   // segment flips to idle, the grace between the real last input and now was
   // actually AFK, not work — but ticks kept booking it as active. Reclaim that
@@ -136,6 +142,22 @@ async function tick() {
   }
 }
 
+let ticking = false;
+
+// tick() is async and `activeWin()` can outrun pollMs (Chrome's URL fetch is the
+// slow one). setInterval fires regardless, so without this guard several ticks
+// run concurrently, each holding a `now` captured before its await and each
+// writing the shared `current` — producing overlapping segments that book the
+// same wall-clock twice. Drop the tick instead of queueing it; the heartbeat
+// rule in tick() already closes the gap a slow call leaves behind.
+// ponytail: a plain boolean, not a queue — a skipped sample is cheaper than a
+// double-counted hour. Revisit only if samples need to be lossless.
+function safeTick() {
+  if (ticking) return;
+  ticking = true;
+  tick().catch(() => {}).finally(() => { ticking = false; });
+}
+
 let powerWired = false;
 let wantTracking = false; // user intent — survives sleep pauses, gates auto-resume
 
@@ -154,8 +176,8 @@ function pausePolling() {
 function resumePolling() {
   if (timer || !wantTracking) return; // already polling, or user paused → stay off
   lastTick = 0;                       // clean restart, no stale-gap heartbeat misfire
-  timer = setInterval(() => { tick().catch(() => {}); }, cfg.pollMs);
-  tick().catch(() => {});
+  timer = setInterval(safeTick, cfg.pollMs);
+  safeTick();
 }
 
 function start() {
@@ -172,8 +194,8 @@ function start() {
     // the running segment so the lock moment isn't booked to the last app.
     powerMonitor.on('lock-screen', () => { flush(Date.now()); current = null; });
   }
-  timer = setInterval(() => { tick().catch(() => {}); }, cfg.pollMs);
-  tick().catch(() => {});
+  timer = setInterval(safeTick, cfg.pollMs);
+  safeTick();
 }
 
 function stop() {
