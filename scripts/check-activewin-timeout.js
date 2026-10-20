@@ -3,7 +3,7 @@
 // crash the process on rejection.  Run: npx electron scripts/check-activewin-timeout.js
 const { app } = require('electron');
 const assert = require('assert');
-const { singleFlightWithTimeout } = require('../src/tracker');
+const { singleFlightWithTimeout, resolveSample } = require('../src/tracker');
 
 let fail = 0;
 const t = async (name, fn) => {
@@ -54,6 +54,79 @@ app.whenReady().then(async () => {
   await t('a slow-but-finishing call is not cut off early', async () => {
     const f = singleFlightWithTimeout(() => after(100, { owner: { name: 'Terminal' } }), 500);
     assert.strictEqual((await f()).owner.name, 'Terminal');
+  });
+
+
+  // ---- resolveSample: what we record when the query comes back empty -------
+  const WIN = (name) => ({ owner: { name }, title: 't', url: null });
+  const fresh = () => ({ lastKnown: null, carryStartedAt: 0 });
+  const CAP = 1000;
+
+  await t('a real window is recorded as itself', async () => {
+    const st = fresh();
+    assert.strictEqual(resolveSample(WIN('Code'), 0, st, CAP).app, 'Code');
+    assert.strictEqual(st.lastKnown.app, 'Code');
+  });
+
+  await t('loginwindow counts as idle, not work', async () => {
+    const st = fresh();
+    const s = resolveSample(WIN('loginwindow'), 0, st, CAP);
+    assert.strictEqual(s.app, 'Idle');
+    assert.strictEqual(s.idle, true);
+  });
+
+  await t('no window and nothing known yet -> Unknown', async () => {
+    assert.strictEqual(resolveSample(null, 0, fresh(), CAP).app, 'Unknown');
+  });
+
+  await t('a stall carries the last known app forward', async () => {
+    const st = fresh();
+    resolveSample(WIN('Google Chrome'), 0, st, CAP);
+    assert.strictEqual(resolveSample(null, 100, st, CAP).app, 'Google Chrome');
+    assert.strictEqual(resolveSample(null, 500, st, CAP).app, 'Google Chrome');
+  });
+
+  await t('carrying stops at the cap', async () => {
+    const st = fresh();
+    resolveSample(WIN('Google Chrome'), 0, st, CAP);
+    resolveSample(null, 100, st, CAP);                       // carry starts at t=100
+    assert.strictEqual(resolveSample(null, 1099, st, CAP).app, 'Google Chrome');
+    assert.strictEqual(resolveSample(null, 1100, st, CAP).app, 'Unknown');
+  });
+
+  await t('past the cap it STAYS Unknown, no fresh carry run', async () => {
+    const st = fresh();
+    resolveSample(WIN('Google Chrome'), 0, st, CAP);
+    resolveSample(null, 100, st, CAP);
+    resolveSample(null, 1100, st, CAP);                      // cap passed
+    for (const at of [1200, 5000, 50000]) {
+      assert.strictEqual(resolveSample(null, at, st, CAP).app, 'Unknown', 'restarted at t=' + at);
+    }
+  });
+
+  await t('a successful query resets the cap window', async () => {
+    const st = fresh();
+    resolveSample(WIN('Google Chrome'), 0, st, CAP);
+    resolveSample(null, 100, st, CAP);
+    resolveSample(WIN('Slack'), 200, st, CAP);               // recovered
+    assert.strictEqual(st.carryStartedAt, 0);
+    assert.strictEqual(resolveSample(null, 1000, st, CAP).app, 'Slack', 'should carry Slack, fresh budget');
+  });
+
+  await t('idle (loginwindow) resets the carry budget', async () => {
+    const st = fresh();
+    resolveSample(WIN('Code'), 0, st, CAP);
+    resolveSample(null, 100, st, CAP);
+    resolveSample(WIN('loginwindow'), 200, st, CAP);
+    assert.strictEqual(st.carryStartedAt, 0);
+  });
+
+  await t('the carried sample is a copy, not the stored object', async () => {
+    const st = fresh();
+    resolveSample(WIN('Code'), 0, st, CAP);
+    const carried = resolveSample(null, 100, st, CAP);
+    carried.app = 'MUTATED';
+    assert.strictEqual(st.lastKnown.app, 'Code');
   });
 
   await new Promise((r) => setTimeout(r, 300)); // let any late rejection surface
