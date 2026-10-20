@@ -2,7 +2,7 @@
   "name": "tally",
   "productName": "Tally",
   "version": "0.3.1",
-  "description": "Tally \u2014 local-first, automatic personal time tracker for macOS",
+  "description": "Tally — local-first, automatic personal time tracker for macOS",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
@@ -24,18 +24,11 @@
     "mac": {
       "icon": "build/icon.png",
       "category": "public.app-category.productivity",
-      "target": [
-        "dmg",
-        "zip"
-      ],
+      "target": ["dmg", "zip"],
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "publish": [
-      {
-        "provider": "github",
-        "owner": "earth9890",
-        "repo": "tally"
-      }
+      { "provider": "github", "owner": "earth9890", "repo": "tally" }
     ]
   },
   "author": "",
