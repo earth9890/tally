@@ -1,7 +1,7 @@
 {
   "name": "tally",
   "productName": "Tally",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Tally — local-first, automatic personal time tracker for macOS",
   "main": "src/main.js",
   "scripts": {
@@ -10,7 +10,8 @@
     "postinstall": "electron-rebuild -f -w better-sqlite3",
     "dist": "electron-builder --mac --publish never",
     "release": "electron-builder --mac --publish always",
-    "check:overlap": "sh scripts/check-overlap.sh"
+    "check:overlap": "sh scripts/check-overlap.sh",
+    "check:activewin": "electron scripts/check-activewin-timeout.js"
   },
   "build": {
     "appId": "io.earth9890.tally",
