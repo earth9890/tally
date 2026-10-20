@@ -104,6 +104,48 @@ function flush(endTs) {
   current = null;
 }
 
+// When the window query times out we know the user is active — the idle check
+// runs first and reads system input, which a hung app cannot affect — we just
+// cannot see which app. Measured on 2026-10-20: 63 of 67 stalls had Chrome
+// frontmost both before and after, so the frontmost app had not changed.
+// Carrying the last known app forward is a better answer than 'Unknown'.
+//
+// Capped, because the assumption decays. The hung query is aimed at the app
+// that WAS frontmost, so switching apps mid-stall does not unblock it, and we
+// would book the new app's time to the old one. CARRY_FORWARD_MAX_MS bounds
+// that to the observed 120s stall plus margin; past it we admit we do not know.
+// Once the cap is passed carryStartedAt deliberately stays set, so it reports
+// 'Unknown' until a query actually succeeds rather than starting a fresh run.
+// ponytail: no 'inferred' column — that is a schema migration to mark a
+// heuristic the cap already bounds. Add one if carried time ever needs
+// excluding from reports.
+const CARRY_FORWARD_MAX_MS = 5 * 60 * 1000;
+const winState = { lastKnown: null, carryStartedAt: 0 };
+
+// Pure, so the self-check can drive every branch without a real window.
+function resolveSample(win, now, state, maxCarryMs) {
+  if (win && win.owner && win.owner.name === 'loginwindow') {
+    state.carryStartedAt = 0;               // locked screen is idle, not a stall
+    return { app: 'Idle', title: null, url: null, idle: true };
+  }
+  if (win && win.owner && win.owner.name) {
+    const s = {
+      app: win.owner.name,
+      title: win.title || null,
+      url: win.url || null,
+      idle: false,
+    };
+    state.lastKnown = s;
+    state.carryStartedAt = 0;
+    return s;
+  }
+  if (state.lastKnown) {
+    if (!state.carryStartedAt) state.carryStartedAt = now;
+    if (now - state.carryStartedAt < maxCarryMs) return { ...state.lastKnown };
+  }
+  return { app: 'Unknown', title: null, url: null, idle: false };
+}
+
 let lastTick = 0;
 
 async function tick() {
@@ -130,21 +172,9 @@ async function tick() {
     } catch (_) {
       // No focused window, or a transient failure — record as Unknown.
     }
-    if (win && win.owner && win.owner.name === 'loginwindow') {
-      // Locked screen — that's idle time, not work.
-      sample = { app: 'Idle', title: null, url: null, idle: true };
-    } else if (win && win.owner && win.owner.name) {
-      sample = {
-        app: win.owner.name,
-        title: win.title || null,
-        url: win.url || null,
-        idle: false,
-      };
-      if (win.owner.path) {
-        db.upsertAppMeta(win.owner.name, win.owner.bundleId || null, win.owner.path);
-      }
-    } else {
-      sample = { app: 'Unknown', title: null, url: null, idle: false };
+    sample = resolveSample(win, now, winState, CARRY_FORWARD_MAX_MS);
+    if (win && win.owner && win.owner.name && win.owner.path) {
+      db.upsertAppMeta(win.owner.name, win.owner.bundleId || null, win.owner.path);
     }
   }
 
@@ -250,4 +280,7 @@ function stop() {
 function isRunning() { return timer !== null; }
 function getCurrent() { return current; }
 
-module.exports = { start, stop, isRunning, getCurrent, onChange, loadConfig, singleFlightWithTimeout };
+module.exports = {
+  start, stop, isRunning, getCurrent, onChange, loadConfig,
+  singleFlightWithTimeout, resolveSample,
+};
