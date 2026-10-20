@@ -1,15 +1,16 @@
 {
   "name": "tally",
   "productName": "Tally",
-  "version": "0.3.0",
-  "description": "Tally — local-first, automatic personal time tracker for macOS",
+  "version": "0.3.1",
+  "description": "Tally \u2014 local-first, automatic personal time tracker for macOS",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
     "postinstall": "electron-rebuild -f -w better-sqlite3",
     "dist": "electron-builder --mac --publish never",
-    "release": "electron-builder --mac --publish always"
+    "release": "electron-builder --mac --publish always",
+    "check:overlap": "sh scripts/check-overlap.sh"
   },
   "build": {
     "appId": "io.earth9890.tally",
@@ -23,11 +24,18 @@
     "mac": {
       "icon": "build/icon.png",
       "category": "public.app-category.productivity",
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "publish": [
-      { "provider": "github", "owner": "earth9890", "repo": "tally" }
+      {
+        "provider": "github",
+        "owner": "earth9890",
+        "repo": "tally"
+      }
     ]
   },
   "author": "",
@@ -43,5 +51,14 @@
     "better-sqlite3": "^11.7.0",
     "electron-updater": "^6.8.9",
     "get-windows": "^9.2.0"
+  },
+  "overrides": {
+    "tar": "^7.5.22",
+    "node-gyp": "^13.1.0",
+    "@xmldom/xmldom": "^0.9.12",
+    "brace-expansion@1": "^1.1.21",
+    "brace-expansion@2": "^2.1.7",
+    "brace-expansion@5": "^5.0.12",
+    "ip-address": "^10.7.4"
   }
 }

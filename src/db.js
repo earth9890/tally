@@ -64,8 +64,90 @@ function init() {
     db.exec('UPDATE segments SET duration=66 WHERE idle=0 AND duration > 70');
   } catch (_) { /* best effort */ }
 
+  deOverlapSegments(file);
+
   seedDefaults();
   return db;
+}
+
+// Concurrent tracker ticks (fixed in 0.3.1) could write several segments
+// covering the same wall-clock window, so SUM(duration) ran up to ~2x real time.
+// Sweep in start order keeping a cursor of the furthest end seen, and clip each
+// segment to the part after that cursor. Leaves the timeline a true partition:
+// no overlaps, duration == span, and the total can only go down.
+//
+// eff_end = MIN(end_ts, start_ts + duration*1000) — never trust a span beyond
+// its recorded duration. Pre-0.2.8 suspended-timer rows carry a multi-hour span
+// with duration=66; without this clamp one phantom span would swallow every
+// real segment after it. Runs AFTER the duration=66 heal above, which it relies on.
+//
+// Probed, not flagged: the EXISTS check is ~7ms on 100k rows, so a stale flag
+// can never strand someone on a double-counted timeline. Self-heals instead.
+//
+// ponytail: first-writer-wins, not smarter attribution — overlapping rows are
+// near-identical samples of the same app, so the choice rarely moves a second
+// between apps. Revisit only if overlaps start spanning genuinely different apps.
+function deOverlapSegments(file) {
+  // Dirty if the timeline isn't a partition (overlap) OR a row's span disagrees
+  // with its duration. The second half catches pre-0.2.8 nap artifacts, whose
+  // end_ts still spans hours while duration was healed to 66 — the timeline drew
+  // a 2h bar for 66s of work. The cheap scan goes first so OR short-circuits.
+  const probe = db.prepare(`
+    SELECT (
+      EXISTS(SELECT 1 FROM segments
+             WHERE ABS(duration - ROUND((end_ts - start_ts) / 1000.0)) > 0)
+      OR EXISTS(SELECT 1 FROM (
+             SELECT start_ts, LAG(end_ts) OVER (ORDER BY start_ts, id) pe FROM segments
+           ) WHERE pe IS NOT NULL AND start_ts < pe)
+    ) AS dirty
+  `).get();
+  if (!probe || !probe.dirty) return;
+
+  // One keepsake of the pre-migration state. Never overwritten, so the backup
+  // always holds the ORIGINAL timeline even if a later launch sweeps again.
+  // VACUUM INTO is synchronous and WAL-consistent, unlike copying the file.
+  try {
+    const bak = file + '.bak-before-deoverlap';
+    if (!require('fs').existsSync(bak)) db.prepare('VACUUM INTO ?').run(bak);
+  } catch (_) { /* a missing backup must not block the fix */ }
+
+  db.transaction(() => {
+    db.exec(`
+      CREATE TEMP TABLE clipped (
+        id        INTEGER PRIMARY KEY,
+        new_start INTEGER NOT NULL,
+        new_end   INTEGER NOT NULL
+      );
+
+      INSERT INTO clipped (id, new_start, new_end)
+      WITH eff AS (
+        SELECT id, start_ts, MIN(end_ts, start_ts + duration * 1000) AS eff_end
+        FROM segments
+      ),
+      sw AS (
+        SELECT id, start_ts, eff_end,
+               MAX(eff_end) OVER (ORDER BY start_ts, id
+                                  ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS cur
+        FROM eff
+      )
+      SELECT id, MAX(start_ts, COALESCE(cur, start_ts)), eff_end FROM sw;
+
+      -- Fully swallowed duplicates, zero-duration rows, and start>end corruption
+      -- all land here: they describe no time, so dropping them loses nothing.
+      DELETE FROM segments WHERE id IN (
+        SELECT id FROM clipped WHERE new_end - new_start < 500
+      );
+
+      UPDATE segments SET
+        start_ts = c.new_start,
+        end_ts   = c.new_end,
+        duration = CAST(ROUND((c.new_end - c.new_start) / 1000.0) AS INTEGER)
+      FROM clipped c
+      WHERE c.id = segments.id;
+
+      DROP TABLE clipped;
+    `);
+  })();
 }
 
 const DEFAULT_CATEGORIES = {
