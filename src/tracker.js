@@ -27,6 +27,47 @@ async function activeWin() {
   return _activeWindow(granted ? undefined : { screenRecordingPermission: false });
 }
 
+// activeWin() shells out to the get-windows Swift helper on every tick, and
+// that call is unbounded. On 2026-10-20 it blocked for up to 141s at a stretch
+// while Chrome was being driven by automation — long enough that ticks piled up
+// and booked the same wall-clock repeatedly. safeTick() stops the pile-up; this
+// stops a stall from blanking the timeline. Note it is NOT the browser-URL
+// fetch: that needs Screen Recording, and without the grant the helper never
+// touches the URL at all — the stall happens on the plain frontmost-window
+// query, which blocks on the target app's own main thread.
+//
+// On timeout we resolve null, which falls through to the existing 'Unknown'
+// branch: the idle check already ran, so we know the user was active, just not
+// which app. Recording that beats leaving a hole.
+//
+// The in-flight call is shared rather than re-issued. Without that, timing out
+// every poll would spawn a fresh helper process every 3s for the whole stall
+// (~47 of them in the 141s case) and make the pressure worse.
+// ponytail: no cancellation — an orphaned call resolves into the void, because
+// get-windows never exposes the child handle. Harmless; it is one process, and
+// the next caller reuses whatever it eventually returns.
+const ACTIVE_WIN_TIMEOUT_MS = 2000;
+
+// Kept generic so the self-check can drive it with a fake call instead of a
+// real window — see scripts/check-activewin-timeout.js.
+function singleFlightWithTimeout(makeCall, timeoutMs) {
+  let inflight = null;
+  return function () {
+    if (!inflight) {
+      inflight = makeCall()
+        .catch(() => null)                   // one shared promise, so it must never reject
+        .finally(() => { inflight = null; });
+    }
+    let t;
+    return Promise.race([
+      inflight,
+      new Promise((resolve) => { t = setTimeout(() => resolve(null), timeoutMs); }),
+    ]).finally(() => clearTimeout(t));
+  };
+}
+
+const activeWinOrNull = singleFlightWithTimeout(() => activeWin(), ACTIVE_WIN_TIMEOUT_MS);
+
 const MAX_SEGMENT_MS = 60 * 1000; // force-flush a running segment after 60s
 
 let timer = null;
@@ -85,7 +126,7 @@ async function tick() {
   } else {
     let win = null;
     try {
-      win = await activeWin();
+      win = await activeWinOrNull();
     } catch (_) {
       // No focused window, or a transient failure — record as Unknown.
     }
@@ -144,8 +185,8 @@ async function tick() {
 
 let ticking = false;
 
-// tick() is async and `activeWin()` can outrun pollMs (Chrome's URL fetch is the
-// slow one). setInterval fires regardless, so without this guard several ticks
+// tick() is async and `activeWin()` can outrun pollMs — see activeWinOrNull()
+// for what actually stalls. setInterval fires regardless, so without this guard several ticks
 // run concurrently, each holding a `now` captured before its await and each
 // writing the shared `current` — producing overlapping segments that book the
 // same wall-clock twice. Drop the tick instead of queueing it; the heartbeat
@@ -209,4 +250,4 @@ function stop() {
 function isRunning() { return timer !== null; }
 function getCurrent() { return current; }
 
-module.exports = { start, stop, isRunning, getCurrent, onChange, loadConfig };
+module.exports = { start, stop, isRunning, getCurrent, onChange, loadConfig, singleFlightWithTimeout };
