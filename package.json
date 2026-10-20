@@ -47,7 +47,6 @@
   },
   "overrides": {
     "tar": "^7.5.22",
-    "node-gyp": "^13.1.0",
     "@xmldom/xmldom": "^0.9.12",
     "brace-expansion@1": "^1.1.21",
     "brace-expansion@2": "^2.1.7",
