@@ -142,6 +142,50 @@ app.whenReady().then(async () => {
       'an unbounded UPDATE would have eaten this'));
   })();
 
+
+  // ---- the duration cap must heal once, then leave data alone -------------
+  await (async () => {
+    const dir = path.join(SB, 'cap');
+    fs.mkdirSync(dir, { recursive: true });
+    const f = path.join(dir, 'desktime.db');
+    const d0 = new Database(f);
+    d0.exec(SCHEMA);
+    d0.prepare('INSERT INTO segments (id,app,title,url,start_ts,end_ts,duration,idle) VALUES (?,?,?,?,?,?,?,?)')
+      .run(1, 'Chrome', null, null, T, T + 120000, 120, 0);     // legacy artifact
+    d0.close();
+
+    app.setPath('userData', dir);
+    delete require.cache[require.resolve(path.join(ROOT, 'src/db.js'))];
+    let db = require(path.join(ROOT, 'src/db.js'));
+    db.init();                                                   // first launch: heals
+
+    let q = new Database(f, { readonly: true });
+    const firstPass = q.prepare('SELECT duration FROM segments WHERE id=1').get().duration;
+    const flag = q.prepare("SELECT value FROM settings WHERE key='duration_cap_healed'").get();
+    q.close();
+    t('legacy >70s row is capped on the first launch', () => assert.strictEqual(firstPass, 66));
+    t('the heal records that it has run', () => assert.strictEqual(flag && flag.value, '1'));
+
+    // A deliberate repair insert, exactly like the Oct-20 gap backfill.
+    const d1 = new Database(f);
+    d1.prepare('INSERT INTO segments (id,app,title,url,start_ts,end_ts,duration,idle) VALUES (?,?,?,?,?,?,?,?)')
+      .run(2, 'Chrome', null, null, T + 200000, T + 320000, 120, 0);
+    d1.close();
+
+    delete require.cache[require.resolve(path.join(ROOT, 'src/db.js'))];
+    db = require(path.join(ROOT, 'src/db.js'));
+    db.init();                                                   // second launch
+
+    q = new Database(f, { readonly: true });
+    const secondPass = q.prepare('SELECT duration FROM segments WHERE id=2').get();
+    q.close();
+    t('a later long row survives the next launch', () => {
+      assert.ok(secondPass, 'repair row was deleted outright');
+      assert.strictEqual(secondPass.duration, 120,
+        'the heal truncated it again — this is the bug that silently reverted 53 repaired segments');
+    });
+  })();
+
   console.log(fail ? `\n${fail} FAILED` : '\nall passed');
   app.exit(fail ? 1 : 0);
 });

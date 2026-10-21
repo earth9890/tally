@@ -59,9 +59,18 @@ function init() {
   // and wake-up flushes that booked whole naps into one segment. Idempotent.
   try {
     db.exec("UPDATE segments SET app='Idle', title=NULL, url=NULL, idle=1 WHERE app='loginwindow'");
-    // The active-segment cap has always been 60s + poll jitter; anything
-    // beyond ~70s is a suspended-timer artifact, not real activity.
-    db.exec('UPDATE segments SET duration=66 WHERE idle=0 AND duration > 70');
+    // The active-segment cap has always been 60s + poll jitter; anything beyond
+    // ~70s is a suspended-timer artifact, not real activity.
+    //
+    // One-time. Since 0.3.4, flush() derives end_ts from the clamped duration,
+    // so no new row can exceed the cap and this has nothing left to heal. Left
+    // running on every launch it truncated any legitimately long row to 66 — and
+    // the de-overlap sweep then shrank end_ts to match, reopening a gap beneath
+    // it. That silently reverted a repair of 53 segments a day after it was made.
+    if (getSettings().duration_cap_healed !== '1') {
+      db.exec('UPDATE segments SET duration=66 WHERE idle=0 AND duration > 70');
+      setSetting('duration_cap_healed', '1');
+    }
   } catch (_) { /* best effort */ }
 
   deOverlapSegments(file);
