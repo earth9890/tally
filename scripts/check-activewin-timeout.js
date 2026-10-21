@@ -3,7 +3,8 @@
 // crash the process on rejection.  Run: npx electron scripts/check-activewin-timeout.js
 const { app } = require('electron');
 const assert = require('assert');
-const { singleFlightWithTimeout, resolveSample } = require('../src/tracker');
+const { singleFlightWithTimeout, resolveSample, forgetWindow,
+        clampSetting, segmentBounds } = require('../src/tracker');
 
 let fail = 0;
 const t = async (name, fn) => {
@@ -127,6 +128,56 @@ app.whenReady().then(async () => {
     const carried = resolveSample(null, 100, st, CAP);
     carried.app = 'MUTATED';
     assert.strictEqual(st.lastKnown.app, 'Code');
+  });
+
+
+  // ---- forgetWindow: carry-forward must not survive sleep or a pause -------
+  await t('forgetting the window stops carry-forward', async () => {
+    const st = fresh();
+    resolveSample(WIN('Google Chrome'), 0, st, CAP);
+    assert.strictEqual(resolveSample(null, 10, st, CAP).app, 'Google Chrome');
+    forgetWindow(st);                                    // sleep / user pause
+    assert.strictEqual(resolveSample(null, 20, st, CAP).app, 'Unknown',
+      'carried a 9h-stale app across a sleep');
+    assert.strictEqual(st.carryStartedAt, 0);
+  });
+
+  // ---- clampSetting: both bounds and the NaN fallback ---------------------
+  await t('settings clamp at both ends and survive junk', async () => {
+    assert.strictEqual(clampSetting('3', 1, 60, 3), 3);
+    assert.strictEqual(clampSetting('0', 1, 60, 3), 1, 'below floor');
+    assert.strictEqual(clampSetting('99999', 1, 60, 3), 60, 'above ceiling');
+    assert.strictEqual(clampSetting('', 1, 60, 3), 3, 'empty -> default');
+    assert.strictEqual(clampSetting('abc', 1, 60, 3), 3, 'NaN -> default');
+    assert.strictEqual(clampSetting(undefined, 30, 3600, 300), 300);
+    assert.strictEqual(clampSetting('-5', 30, 3600, 300), 30, 'negative -> floor');
+  });
+
+  // ---- segmentBounds: duration must always equal the span it reports ------
+  await t('an unclamped segment keeps its exact end', async () => {
+    const r = segmentBounds(1000, 1000 + 30000, 66);
+    assert.strictEqual(r.duration, 30);
+    assert.strictEqual(r.endOut, 31000, 'must stay contiguous with the next segment');
+  });
+
+  await t('a clamped segment shrinks its end to match duration', async () => {
+    const r = segmentBounds(1000, 1000 + 600000, 66);   // 10 min span, 66s cap
+    assert.strictEqual(r.duration, 66);
+    assert.strictEqual(r.endOut, 1000 + 66000, 'end_ts must follow the clamp');
+    assert.strictEqual(Math.round((r.endOut - 1000) / 1000), r.duration,
+      'duration != span would trip the timeline invariant');
+  });
+
+  await t('clamped end never runs past the real end (no overlap)', async () => {
+    const endTs = 1000 + 600000;
+    const r = segmentBounds(1000, endTs, 66);
+    assert.ok(r.endOut <= endTs, 'would overlap whatever starts next');
+  });
+
+  await t('a backwards clock yields a dropped segment, not a corrupt one', async () => {
+    const r = segmentBounds(5000, 1000, 66);            // end before start
+    assert.ok(r.duration < 1, 'flush() drops it on duration >= 1');
+    assert.ok(r.endOut <= 5000);
   });
 
   await new Promise((r) => setTimeout(r, 300)); // let any late rejection surface

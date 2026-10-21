@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- electron-builder's defaults. Supplying our own file replaces them
+       wholesale, so they have to be repeated here or the app will not launch:
+       Electron needs JIT, and the native modules (better-sqlite3, get-windows)
+       need library validation off to load unsigned-by-Apple dylibs. -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+  <true/>
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+
+  <!-- Lets Tally ask the browser for the active tab's URL. Without BOTH this
+       entitlement and NSAppleEventsUsageDescription, a hardened-runtime app is
+       denied silently: no prompt, and it never appears under
+       Privacy & Security -> Automation. -->
+  <key>com.apple.security.automation.apple-events</key>
+  <true/>
+</dict>
+</plist>

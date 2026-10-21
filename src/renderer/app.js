@@ -48,7 +48,7 @@ document.querySelectorAll('.nav button').forEach((b) => {
 });
 
 function load(tab) {
-  ({ dashboard: loadDashboard, history: loadHistory, categories: loadCategories, reminders: loadReminders, agents: loadAgents, settings: loadSettings }[tab])();
+  ({ dashboard: loadDashboard, history: loadHistory, categories: loadCategories, reminders: loadReminders, agents: loadAgents, system: loadSystem, settings: loadSettings }[tab])();
 }
 
 // ---- dashboard ----------------------------------------------------------
@@ -472,6 +472,112 @@ async function renderAgents() {
 }
 
 setInterval(() => { if ($('agents').classList.contains('active')) renderAgents(); }, 5000);
+
+
+// ---- system check -------------------------------------------------------
+
+const LED = { granted: 'ok', denied: 'bad', restricted: 'bad' };
+const STATE_LABEL = {
+  granted: 'Granted', denied: 'Not granted', restricted: 'Blocked by policy',
+  'not-determined': 'Not asked yet', unknown: 'Unknown',
+};
+
+function permRow(p) {
+  const led = LED[p.status] || 'unknown';
+  const el = document.createElement('div');
+  el.className = 'perm';
+  const needsAction = p.status !== 'granted';
+  el.innerHTML = `
+    <span class="led ${led}"></span>
+    <div>
+      <div class="nm">${p.name}${p.impact === 'optional' ? '<span class="tag">optional</span>' : ''}</div>
+      <div class="why">${p.why}</div>
+    </div>
+    <div class="act">
+      <span class="state">${STATE_LABEL[p.status] || p.status}</span>
+    </div>`;
+  if (needsAction) {
+    const act = el.querySelector('.act');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-ghost';
+    btn.textContent = p.canRequest ? 'Grant' : 'Open Settings';
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = 'Opening…';
+      try {
+        if (p.canRequest) await dt.grantPermission(p.id);
+        else await dt.openPermissionSettings(p.id);
+      } finally {
+        // macOS often applies a grant a beat after the prompt closes, so re-read
+        // rather than trusting whatever came back from the request itself.
+        setTimeout(loadSystem, 600);
+      }
+    });
+    act.appendChild(btn);
+  }
+  return el;
+}
+
+function healthRow(name, ok, detail) {
+  const el = document.createElement('div');
+  el.className = 'perm';
+  el.innerHTML = `
+    <span class="led ${ok ? 'ok' : 'bad'}"></span>
+    <div><div class="nm">${name}</div><div class="why">${detail}</div></div>
+    <div class="act"><span class="state">${ok ? 'OK' : 'Check'}</span></div>`;
+  return el;
+}
+
+async function loadSystem() {
+  const v = $('sys-verdict');
+  v.className = 'verdict';
+  v.textContent = 'Checking…';
+
+  const data = await dt.systemCheck();
+
+  const permBox = $('sys-perms');
+  permBox.innerHTML = '';
+  for (const p of data.permissions) permBox.appendChild(permRow(p));
+
+  const missingRequired = data.permissions.filter(
+    (p) => p.impact === 'required' && p.status !== 'granted');
+  const missingOptional = data.permissions.filter(
+    (p) => p.impact === 'optional' && p.status !== 'granted' && p.status !== 'unknown');
+
+  const i = data.integrity;
+  const ageMs = i.lastSegmentEnd ? Date.now() - i.lastSegmentEnd : null;
+  const stale = !data.tracking ? false : (ageMs === null || ageMs > 5 * 60 * 1000);
+
+  const h = $('sys-health');
+  h.innerHTML = '';
+  h.appendChild(healthRow('Tracking', data.tracking,
+    data.tracking ? 'Sampling the foreground app.' : 'Paused — no activity is being recorded.'));
+  h.appendChild(healthRow('Recording activity', !stale,
+    ageMs === null ? 'Nothing recorded yet.'
+      : `Last segment written ${fmt(Math.round(ageMs / 1000))} ago.`));
+  h.appendChild(healthRow('No double-counted time', i.overlaps === 0,
+    i.overlaps === 0 ? `No overlapping segments in the last ${i.days} days.`
+      : `${i.overlaps} overlapping segments — time is being counted twice.`));
+  h.appendChild(healthRow('Timeline consistent', i.mismatched === 0,
+    i.mismatched === 0 ? 'Every segment\'s duration matches its span.'
+      : `${i.mismatched} segments disagree with their own start/end.`));
+
+  const problems = missingRequired.length + (stale ? 1 : 0)
+    + (i.overlaps ? 1 : 0) + (i.mismatched ? 1 : 0);
+  if (problems) {
+    v.classList.add('bad');
+    v.textContent = `${problems} thing${problems > 1 ? 's' : ''} need attention`;
+  } else if (missingOptional.length) {
+    v.classList.add('warn');
+    v.textContent = 'Working — some optional permissions are off';
+  } else {
+    v.classList.add('ok');
+    v.textContent = 'Everything checks out';
+  }
+}
+
+document.getElementById('sys-refresh').addEventListener('click', loadSystem);
 
 // ---- settings -----------------------------------------------------------
 
