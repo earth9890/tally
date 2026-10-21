@@ -9,6 +9,7 @@ const db = require('./db');
 const tracker = require('./tracker');
 const reminders = require('./reminders');
 const agents = require('./agents');
+const permissions = require('./permissions');
 
 let tray = null;
 let win = null;
@@ -291,6 +292,20 @@ function rangeFor(range) {
 }
 
 function registerIpc() {
+  ipcMain.handle('systemCheck', async () => ({
+    permissions: await permissions.list(),
+    integrity: db.integrity(),
+    tracking: tracker.isRunning(),
+    version: app.getVersion(),
+  }));
+  ipcMain.handle('grantPermission', async (_e, id) => {
+    await permissions.request(id);
+    // Re-read after the prompt so the panel reflects the new state without the
+    // user having to reopen it. Several macOS grants land asynchronously, so a
+    // still-denied row here is normal and the next refresh picks it up.
+    return permissions.list();
+  });
+  ipcMain.handle('openPermissionSettings', (_e, id) => permissions.openSettings(id));
   ipcMain.handle('summary', async (_e, range) => {
     const [from, to] = rangeFor(range);
     const s = db.summary(from, to);
@@ -462,6 +477,16 @@ function registerIpc() {
 }
 
 // ---- lifecycle ----------------------------------------------------------
+
+// Two copies polling the same database both write segments for the same
+// wall-clock, which is exactly the double-counting 0.3.1 fixed in the tracker.
+// The lock is keyed on userData, so a second copy pointed at a different
+// --user-data-dir (the smoke-test setup) is still free to run.
+if (!app.requestSingleInstanceLock()) {
+  app.exit(0);
+} else {
+  app.on('second-instance', () => { createWindow(); });
+}
 
 app.whenReady().then(() => {
   db.init();

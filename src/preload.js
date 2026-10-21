@@ -27,5 +27,8 @@ contextBridge.exposeInMainWorld('api', {
   saveReminder: (r) => ipcRenderer.invoke('saveReminder', r),
   deleteReminder: (id) => ipcRenderer.invoke('deleteReminder', id),
   testReminder: (id) => ipcRenderer.invoke('testReminder', id),
+  systemCheck: () => ipcRenderer.invoke('systemCheck'),
+  grantPermission: (id) => ipcRenderer.invoke('grantPermission', id),
+  openPermissionSettings: (id) => ipcRenderer.invoke('openPermissionSettings', id),
   onCurrent: (cb) => ipcRenderer.on('current', (_e, data) => cb(data)),
 });

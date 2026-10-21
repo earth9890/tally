@@ -1,7 +1,7 @@
 {
   "name": "tally",
   "productName": "Tally",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Tally — local-first, automatic personal time tracker for macOS",
   "main": "src/main.js",
   "scripts": {
@@ -11,7 +11,9 @@
     "dist": "electron-builder --mac --publish never",
     "release": "electron-builder --mac --publish always",
     "check:overlap": "sh scripts/check-overlap.sh",
-    "check:activewin": "electron scripts/check-activewin-timeout.js"
+    "check:activewin": "electron scripts/check-activewin-timeout.js",
+    "check:db": "electron scripts/check-db.js",
+    "check": "npm run check:activewin && npm run check:db && npm run check:overlap"
   },
   "build": {
     "appId": "io.earth9890.tally",
@@ -26,6 +28,11 @@
       "icon": "build/icon.png",
       "category": "public.app-category.productivity",
       "target": ["dmg", "zip"],
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "Tally reads the active browser tab's title and URL so your time can be attributed to the right site. Decline and Tally still tracks at the app level."
+      },
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "publish": [

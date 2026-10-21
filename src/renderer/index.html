@@ -24,6 +24,7 @@
         <button data-tab="categories"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>Apps</button>
         <button data-tab="reminders"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Reminders</button>
         <button data-tab="agents"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M8 4h8"/><circle cx="9" cy="13.5" r="1"/><circle cx="15" cy="13.5" r="1"/><path d="M9.5 17h5"/></svg>Agents</button>
+        <button data-tab="system"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/><path d="m9 12 2 2 4-4"/></svg>System</button>
         <button data-tab="settings"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>Settings</button>
       </nav>
 
@@ -203,6 +204,21 @@
         </section>
 
         <!-- Settings -->
+        <section id="system" class="tab">
+          <p class="eyebrow">System check</p>
+          <div class="syshead">
+            <div id="sys-verdict" class="verdict">Checking…</div>
+            <button type="button" id="sys-refresh" class="btn-ghost">Re-check</button>
+          </div>
+          <div class="perms" id="sys-perms"></div>
+          <p class="eyebrow mt">Tracking health</p>
+          <div class="perms" id="sys-health"></div>
+          <div class="note">
+            <p>macOS reports some grants only after the app restarts. If a row stays red
+               straight after granting, quit and reopen Tally.</p>
+          </div>
+        </section>
+
         <section id="settings" class="tab">
           <p class="eyebrow">Settings</p>
           <div class="settings">

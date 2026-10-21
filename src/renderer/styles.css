@@ -398,3 +398,30 @@ select:focus-visible { outline: 2px solid color-mix(in oklab, var(--accent) 50%,
 .about .a-link:hover { text-decoration: underline; }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---- system check ------------------------------------------------------ */
+.syshead { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.verdict { font-weight: 500; flex: 1; }
+.verdict.ok   { color: light-dark(#15803d, #4ade80); }
+.verdict.warn { color: var(--accent-deep); }
+.verdict.bad  { color: light-dark(#b91c1c, #f87171); }
+
+.btn-ghost {
+  font: inherit; font-size: 13px; cursor: pointer; color: var(--muted);
+  background: var(--panel-2); border: 1px solid var(--border-2);
+  padding: 6px 13px; border-radius: var(--r3); transition: color .15s;
+}
+.btn-ghost:hover { color: var(--ink); }
+
+.perms { display: flex; flex-direction: column; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r3); overflow: hidden; }
+.perm { display: grid; grid-template-columns: 11px 1fr auto; align-items: start; gap: 13px; padding: 15px 17px; background: var(--panel); }
+.perm .led { width: 9px; height: 9px; border-radius: 50%; margin-top: 5px; flex: none; }
+.perm .led.ok      { background: light-dark(#16a34a, #4ade80); }
+.perm .led.bad     { background: light-dark(#dc2626, #f87171); }
+.perm .led.unknown { background: var(--muted); opacity: .55; }
+.perm .nm { font-weight: 500; display: flex; align-items: center; gap: 9px; }
+.perm .tag { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); border: 1px solid var(--border-2); border-radius: 4px; padding: 1px 5px; }
+.perm .why { font-size: 12.5px; color: var(--muted); margin-top: 4px; max-width: 54ch; }
+.perm .act { display: flex; gap: 7px; align-items: center; }
+.perm .state { font-size: 12.5px; color: var(--muted); }
+.mt { margin-top: 34px; }

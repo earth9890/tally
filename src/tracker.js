@@ -75,28 +75,55 @@ let current = null; // { app, title, url, idle, start }
 let cfg = { pollMs: 3000, idleThresholdSec: 300 };
 let listeners = [];
 
+// Both are user-editable from the settings pane, so they are clamped at both
+// ends. The upper bound on pollMs matters: flush()'s clamp is 60s + 2 polls, so
+// an unbounded poll interval would license unbounded segment durations — the
+// exact failure the clamp exists to prevent. NaN falls back to the default.
+// Pure, so the self-check can cover the bounds and the NaN fallback.
+function clampSetting(value, lo, hi, dflt) {
+  // Number('') is 0, so an empty setting would clamp to the floor instead of
+  // falling back to the default. Treat blank/missing as missing, like the
+  // `value || default` this replaced.
+  const blank = value === '' || value === null || value === undefined;
+  const n = blank ? NaN : Number(value);
+  return Math.min(Math.max(Number.isFinite(n) ? n : dflt, lo), hi);
+}
+
 function loadConfig() {
   const s = db.getSettings();
-  cfg.pollMs = Math.max(1, Number(s.poll_interval || 3)) * 1000;
-  cfg.idleThresholdSec = Math.max(30, Number(s.idle_threshold || 300));
+  cfg.pollMs = clampSetting(s.poll_interval, 1, 60, 3) * 1000;
+  cfg.idleThresholdSec = clampSetting(s.idle_threshold, 30, 3600, 300);
 }
 
 function onChange(fn) { listeners.push(fn); }
 function emit() { for (const fn of listeners) fn(current); }
+
+// When the clamp bites we are saying the extra span is not attributable, so
+// end_ts has to shrink with it. Leaving end_ts at the full span produced rows
+// where duration != (end - start), which breaks the timeline invariant and makes
+// db.init() re-sweep every segment on the next launch. The discarded span
+// becomes an honest gap. Unclamped rows keep the exact endTs, so consecutive
+// segments stay contiguous and cannot be nudged into overlapping by rounding.
+// Pure, so the self-check can cover the clamp and the backwards-clock case.
+function segmentBounds(startTs, endTs, maxSec) {
+  const rawSec = Math.round((endTs - startTs) / 1000);
+  const duration = Math.min(rawSec, maxSec);
+  return { duration, endOut: duration === rawSec ? endTs : startTs + duration * 1000 };
+}
 
 function flush(endTs) {
   if (!current) return;
   // Clamp: timers don't fire during sleep, so a wake-up flush can span the
   // whole nap — without this, one segment silently books hours of "work".
   const maxSec = Math.round(MAX_SEGMENT_MS / 1000 + (2 * cfg.pollMs) / 1000);
-  const duration = Math.min(Math.round((endTs - current.start) / 1000), maxSec);
+  const { duration, endOut } = segmentBounds(current.start, endTs, maxSec);
   if (duration >= 1) {
     db.insertSegment({
       app: current.app,
       title: current.title,
       url: current.url,
       start_ts: current.start,
-      end_ts: endTs,
+      end_ts: endOut,
       duration,
       idle: current.idle ? 1 : 0,
     });
@@ -144,6 +171,15 @@ function resolveSample(win, now, state, maxCarryMs) {
     if (now - state.carryStartedAt < maxCarryMs) return { ...state.lastKnown };
   }
   return { app: 'Unknown', title: null, url: null, idle: false };
+}
+
+// Carrying an app forward is only defensible while we are actually sampling.
+// Across a sleep or a user pause we stop observing entirely, so whatever was
+// frontmost before is worthless — after a 9h sleep it may not even be running.
+// Forget it, and a post-wake timeout reports 'Unknown' until a query succeeds.
+function forgetWindow(state = winState) {
+  state.lastKnown = null;
+  state.carryStartedAt = 0;
 }
 
 let lastTick = 0;
@@ -204,7 +240,7 @@ async function tick() {
 
   if (changed) {
     flush(now);
-    if (idleOnset) db.reclaimActiveAsIdle(now - idleSec * 1000);
+    if (idleOnset) db.reclaimActiveAsIdle(now - idleSec * 1000, now);
     current = { ...sample, start: now };
     emit();
   } else if (capped) {
@@ -242,6 +278,7 @@ function pausePolling() {
   if (timer) { clearInterval(timer); timer = null; }
   flush(Date.now());
   current = null;
+  forgetWindow();
 }
 
 function resumePolling() {
@@ -255,6 +292,9 @@ function start() {
   if (timer) return;
   loadConfig();
   wantTracking = true;
+  lastTick = 0;   // same clean restart resumePolling() does; a stale lastTick
+                  // would make the first tick's heartbeat compare against a gap
+                  // from the previous run.
   if (!powerWired) {
     powerWired = true;
     // Sleep pauses polling; wake (or unlock, as a redundant wake signal) resumes.
@@ -274,6 +314,7 @@ function stop() {
   if (timer) { clearInterval(timer); timer = null; }
   flush(Date.now());
   current = null;
+  forgetWindow();
   emit();
 }
 
@@ -282,5 +323,6 @@ function getCurrent() { return current; }
 
 module.exports = {
   start, stop, isRunning, getCurrent, onChange, loadConfig,
-  singleFlightWithTimeout, resolveSample,
+  singleFlightWithTimeout, resolveSample, forgetWindow,
+  clampSetting, segmentBounds,
 };

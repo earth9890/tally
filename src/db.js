@@ -285,10 +285,15 @@ function insertSegment(seg) {
 // idle whatever app was frontmost, so normalise to the 'Idle' convention. Only
 // touches idle=0 rows at/after fromTs — fromTs = now - real-seconds-since-input,
 // so a manual lock (tiny gap) reclaims nothing and real work is never eaten.
-function reclaimActiveAsIdle(fromTs) {
+// Bounded at both ends. fromTs alone is open-ended, so a bad clock or an
+// unexpectedly large idleSec would rewrite arbitrarily far forward. Today the
+// heartbeat rule nulls `current` before a stale idleSec can reach here, but that
+// is one edit away from not being true, and the blast radius is the whole table.
+function reclaimActiveAsIdle(fromTs, toTs) {
   db.prepare(
-    "UPDATE segments SET app='Idle', title=NULL, url=NULL, idle=1 WHERE idle=0 AND start_ts >= ?"
-  ).run(fromTs);
+    "UPDATE segments SET app='Idle', title=NULL, url=NULL, idle=1 "
+    + 'WHERE idle=0 AND start_ts >= ? AND start_ts <= ?'
+  ).run(fromTs, toTs);
 }
 
 // ---- settings -----------------------------------------------------------
@@ -390,7 +395,33 @@ function seenApps() {
   `).all();
 }
 
+// Health counters for the System Check panel. These are the invariants the
+// tracker is supposed to maintain: segments never overlap, and a row's duration
+// always equals its span. A non-zero count here means time is being
+// double-counted or the timeline disagrees with itself. Scoped to the last 7
+// days so the query stays cheap on a table with six figures of rows.
+function integrity(days = 7) {
+  const since = Date.now() - days * 86400000;
+  const overlaps = db.prepare(`
+    WITH s AS (
+      SELECT start_ts, LAG(end_ts) OVER (ORDER BY start_ts, id) pe
+      FROM segments WHERE start_ts >= ?
+    )
+    SELECT COUNT(*) n FROM s WHERE pe IS NOT NULL AND start_ts < pe
+  `).get(since).n;
+
+  const mismatched = db.prepare(`
+    SELECT COUNT(*) n FROM segments
+    WHERE start_ts >= ? AND ABS(duration - ROUND((end_ts - start_ts) / 1000.0)) > 0
+  `).get(since).n;
+
+  const last = db.prepare('SELECT MAX(end_ts) m FROM segments').get().m;
+  const rows = db.prepare('SELECT COUNT(*) n FROM segments').get().n;
+  return { overlaps, mismatched, lastSegmentEnd: last || null, rows, days };
+}
+
 module.exports = {
+  integrity,
   init,
   insertSegment,
   reclaimActiveAsIdle,
