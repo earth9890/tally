@@ -2,23 +2,23 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <!-- electron-builder's defaults. Supplying our own file replaces them
-       wholesale, so they have to be repeated here or the app will not launch:
-       Electron needs JIT, and the native modules (better-sqlite3, get-windows)
-       need library validation off to load unsigned-by-Apple dylibs. -->
+  <!-- Main app. Supplying an entitlements file replaces electron-builder's
+       defaults wholesale, so the ones Electron genuinely needs are repeated.
+       Deliberately NOT here: com.apple.security.cs.allow-dyld-environment-variables.
+       0.3.3 shipped without it and nothing needs it; combined with
+       disable-library-validation it lets a local process point DYLD_* at the
+       signed binary and inherit Tally's TCC grants. -->
   <key>com.apple.security.cs.allow-jit</key>
   <true/>
   <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
   <true/>
-  <key>com.apple.security.cs.allow-dyld-environment-variables</key>
-  <true/>
+  <!-- better-sqlite3's .node is dlopen'd into this process. -->
   <key>com.apple.security.cs.disable-library-validation</key>
   <true/>
 
-  <!-- Lets Tally ask the browser for the active tab's URL. Without BOTH this
-       entitlement and NSAppleEventsUsageDescription, a hardened-runtime app is
-       denied silently: no prompt, and it never appears under
-       Privacy & Security -> Automation. -->
+  <!-- Lets Tally ask the browser for the active tab's URL. Needs
+       NSAppleEventsUsageDescription alongside it or a hardened-runtime app is
+       denied silently. Main process only: helpers never send Apple Events. -->
   <key>com.apple.security.automation.apple-events</key>
   <true/>
 </dict>

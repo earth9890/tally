@@ -27,21 +27,29 @@
     "mac": {
       "icon": "build/icon.png",
       "category": "public.app-category.productivity",
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
       "extendInfo": {
         "NSAppleEventsUsageDescription": "Tally reads the active browser tab's title and URL so your time can be attributed to the right site. Decline and Tally still tracks at the app level."
       },
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "publish": [
-      { "provider": "github", "owner": "earth9890", "repo": "tally" }
+      {
+        "provider": "github",
+        "owner": "earth9890",
+        "repo": "tally"
+      }
     ]
   },
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@electron/fuses": "^2.1.3",
     "@electron/rebuild": "^3.7.1",
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8"
